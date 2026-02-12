@@ -1,5 +1,10 @@
 <x-app-layout>
-    <x-slot name="header"><h4 class="mb-0">Administration - Chambres</h4></x-slot>
+    <x-slot name="header">
+        <div>
+            <h4 class="mb-1">Administration - Chambres</h4>
+            <div class="small text-white-50">Création, édition et placement visuel des chambres</div>
+        </div>
+    </x-slot>
 
     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
     @if($errors->any())
@@ -8,7 +13,7 @@
         </div>
     @endif
 
-    <div class="card mb-3"><div class="card-body">
+    <div class="gh-card card mb-3"><div class="card-body">
         <form method="POST" action="{{ route('owner.rooms.store') }}" class="row g-2">
             @csrf
             <div class="col-md-2">
@@ -31,11 +36,11 @@
             <div class="col-md-2"><input name="price_per_night" type="number" step="0.01" class="form-control" placeholder="Prix" value="{{ old('price_per_night') }}" required></div>
             <div class="col-md-2"><input name="dimension_width" type="number" min="60" max="500" class="form-control" placeholder="Largeur (px)" value="{{ old('dimension_width', 120) }}"></div>
             <div class="col-md-2"><input name="dimension_height" type="number" min="40" max="300" class="form-control" placeholder="Hauteur (px)" value="{{ old('dimension_height', 80) }}"></div>
-            <div class="col-md-1"><button class="btn btn-primary w-100">Créer</button></div>
+            <div class="col-md-1"><button class="btn gh-btn-primary btn-primary w-100">Créer</button></div>
         </form>
     </div></div>
 
-    <div class="card mb-3">
+    <div class="gh-card card mb-3">
         <div class="card-header">Modifier une chambre</div>
         <div class="card-body">
             @if($rooms->isEmpty())
@@ -72,20 +77,20 @@
                     <div class="col-md-1"><label class="form-label">Prix</label><input name="price_per_night" id="edit_price_per_night" type="number" step="0.01" class="form-control" required></div>
                     <div class="col-md-1"><label class="form-label">Larg.</label><input name="dimension_width" id="edit_dimension_width" type="number" min="60" max="500" class="form-control"></div>
                     <div class="col-md-1"><label class="form-label">Haut.</label><input name="dimension_height" id="edit_dimension_height" type="number" min="40" max="300" class="form-control"></div>
-                    <div class="col-12 d-flex justify-content-end"><button class="btn btn-outline-primary">Enregistrer les modifications</button></div>
+                    <div class="col-12 d-flex justify-content-end gh-mobile-stack"><button class="btn gh-btn-primary btn-primary">Enregistrer les modifications</button></div>
                 </form>
             @endif
         </div>
     </div>
 
-    <div class="card mt-3">
+    <div class="gh-card card mt-3">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Plan graphique des chambres (déplacer + redimensionner)</span>
-            <button id="saveLayout" class="btn btn-sm btn-primary">Sauvegarder le plan</button>
+            <button id="saveLayout" class="btn btn-sm gh-btn-primary btn-primary">Sauvegarder le plan</button>
         </div>
         <div class="card-body">
             <div class="small text-muted mb-2">Astuce: glissez une chambre pour la placer, utilisez la poignée en bas à droite pour agrandir/réduire, puis sauvegardez.</div>
-            <div id="roomBoard" class="border rounded bg-white position-relative overflow-auto" style="height: 560px;">
+            <div id="roomBoard" class="gh-room-board border rounded position-relative overflow-auto" style="background: linear-gradient(135deg, #ffffff, #f8fafc); border-color:#e7ebf1 !important;">
                 @foreach($rooms as $r)
                     @php
                         $width = 120;
@@ -96,26 +101,26 @@
                         }
                     @endphp
                     <div
-                        class="room-card position-absolute border rounded bg-light p-2"
+                        class="room-card position-absolute border rounded p-2"
                         data-room-id="{{ $r->id }}"
                         data-room-label="{{ $r->number }}"
-                        style="left: {{ $r->position_x }}px; top: {{ $r->position_y }}px; width: {{ $width }}px; height: {{ $height }}px; cursor: move; user-select: none;"
+                        style="left: {{ $r->position_x }}px; top: {{ $r->position_y }}px; width: {{ $width }}px; height: {{ $height }}px; cursor: move; user-select: none; background:#ffffff; border-color:#dbe2ea !important; box-shadow: 0 6px 16px rgba(17,24,39,.08);"
                     >
                         <div class="fw-semibold">{{ $r->number }}</div>
                         <div class="small text-muted">{{ $r->apartment->name }}</div>
                         <div class="small">{{ ['occupied' => 'occupée', 'reserved' => 'réservée', 'available' => 'libre'][$r->status] ?? $r->status }}</div>
-                        <div class="resize-handle position-absolute" style="right: 3px; bottom: 3px; width: 12px; height: 12px; background: #0d6efd; border-radius: 2px; cursor: nwse-resize;"></div>
+                        <div class="resize-handle position-absolute" style="right: 3px; bottom: 3px; width: 12px; height: 12px; background: #111827; border-radius: 2px; cursor: nwse-resize;"></div>
                     </div>
                 @endforeach
             </div>
         </div>
     </div>
 
-    <div class="card table-responsive mt-3">
-        <table class="table mb-0">
-            <thead><tr><th>#</th><th>Appart.</th><th>Type</th><th>Prix</th><th>Dimension</th><th>Position</th></tr></thead>
+    <div class="gh-card card table-responsive mt-3">
+        <table class="table align-middle mb-0">
+            <thead class="table-light"><tr><th>#</th><th>Appart.</th><th>Type</th><th>Prix</th><th>Dimension</th><th>Position</th></tr></thead>
             <tbody>
-                @foreach($rooms as $r)
+                @forelse($rooms as $r)
                     <tr>
                         <td>{{ $r->number }}</td>
                         <td>{{ $r->apartment->name }}</td>
@@ -124,7 +129,11 @@
                         <td>{{ $r->dimension ?? '-' }}</td>
                         <td>{{ $r->position_x }}, {{ $r->position_y }}</td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr>
+                        <td colspan="6"><div class="gh-empty my-2">Aucune chambre créée pour le moment.</div></td>
+                    </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
@@ -142,8 +151,10 @@
         })->values();
     @endphp
 
+    <script id="roomsDataJson" type="application/json">@json($roomsDataForJs)</script>
+
     <script>
-        const roomsData = @json($roomsDataForJs);
+        const roomsData = JSON.parse(document.getElementById('roomsDataJson').textContent || '[]');
 
         const updateRoomBaseUrl = "{{ url('/owner/rooms') }}";
 
