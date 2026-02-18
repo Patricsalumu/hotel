@@ -23,6 +23,10 @@
         </div>
     </x-slot>
 
+        @php
+            $currency = $hotel->currency ?? 'FC';
+        @endphp
+
     <div class="gh-card card mb-3"><div class="card-body">
         <form method="GET" class="row g-2 align-items-end cb-toolbar">
             <div class="col-md-3"><label class="form-label">De</label><input type="date" name="from_date" class="form-control" value="{{ $from->format('Y-m-d') }}"></div>
@@ -32,9 +36,9 @@
     </div></div>
 
     <div class="row g-3 mb-3">
-        <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Entrées</div><div class="cb-kpi-value text-success">{{ number_format($totalIn,2) }}</div></div></div>
-        <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Sorties</div><div class="cb-kpi-value text-danger">{{ number_format($totalOut,2) }}</div></div></div>
-        <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Solde net</div><div class="cb-kpi-value {{ ($totalIn - $totalOut) >= 0 ? 'text-success' : 'text-danger' }}">{{ number_format($totalIn - $totalOut, 2) }}</div></div></div>
+        <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Entrées</div><div class="cb-kpi-value text-success">{{ \App\Support\Money::format($totalIn, $currency) }}</div></div></div>
+        <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Sorties</div><div class="cb-kpi-value text-danger">{{ \App\Support\Money::format($totalOut, $currency) }}</div></div></div>
+        <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Solde net</div><div class="cb-kpi-value {{ ($totalIn - $totalOut) >= 0 ? 'text-success' : 'text-danger' }}">{{ \App\Support\Money::format($totalIn - $totalOut, $currency) }}</div></div></div>
     </div>
 
     <div class="gh-card card mb-3">
@@ -65,7 +69,7 @@
                     <thead class="table-light"><tr><th>Heure</th><th>Chambre</th><th>Montant</th><th>Méthode</th></tr></thead>
                     <tbody>
                         @forelse($payments as $p)
-                            <tr><td>{{ $p->created_at }}</td><td>{{ $p->reservation->room->number ?? '-' }}</td><td>{{ number_format($p->amount,2) }}</td><td>{{ ['cash' => 'Espèces', 'mobile' => 'Mobile money', 'card' => 'Carte'][$p->payment_method] ?? $p->payment_method }}</td></tr>
+                            <tr><td>{{ $p->created_at }}</td><td>{{ $p->reservation->room->number ?? '-' }}</td><td>{{ \App\Support\Money::format($p->amount, $currency) }}</td><td>{{ ['cash' => 'Espèces', 'mobile' => 'Mobile money', 'card' => 'Carte'][$p->payment_method] ?? $p->payment_method }}</td></tr>
                         @empty
                             <tr><td colspan="4"><div class="gh-empty my-2">Aucune entrée pour la période sélectionnée.</div></td></tr>
                         @endforelse
@@ -80,7 +84,7 @@
                     <thead class="table-light"><tr><th>Heure</th><th>Catégorie</th><th>Montant</th><th>Description</th></tr></thead>
                     <tbody>
                         @forelse($expenses as $e)
-                            <tr><td>{{ $e->created_at }}</td><td>{{ ['carburant' => 'Carburant', 'transport' => 'Transport', 'salaires' => 'Salaires', 'autres' => 'Autres'][$e->category] ?? ucfirst($e->category) }}</td><td>{{ number_format($e->amount,2) }}</td><td>{{ $e->description }}</td></tr>
+                            <tr><td>{{ $e->created_at }}</td><td>{{ ['carburant' => 'Carburant', 'transport' => 'Transport', 'salaires' => 'Salaires', 'autres' => 'Autres'][$e->category] ?? ucfirst($e->category) }}</td><td>{{ \App\Support\Money::format($e->amount, $currency) }}</td><td>{{ $e->description }}</td></tr>
                         @empty
                             <tr><td colspan="4"><div class="gh-empty my-2">Aucune dépense pour la période sélectionnée.</div></td></tr>
                         @endforelse

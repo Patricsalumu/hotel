@@ -66,6 +66,13 @@
                 <div class="col-md-3"><label class="form-label">Adresse</label><input class="form-control" name="address" value="{{ old('address') }}"></div>
                 <div class="col-md-2"><label class="form-label">Ville</label><input class="form-control" name="city" value="{{ old('city') }}"></div>
                 <div class="col-md-2"><label class="form-label">Téléphone</label><input class="form-control" name="phone" value="{{ old('phone') }}"></div>
+                <div class="col-md-1">
+                    <label class="form-label">Devise</label>
+                    <select class="form-select" name="currency" required>
+                        <option value="FC" @selected(old('currency', 'FC') === 'FC')>FC</option>
+                        <option value="USD" @selected(old('currency') === 'USD')>Dollar</option>
+                    </select>
+                </div>
                 <div class="col-md-2"><label class="form-label">Logo</label><input type="file" class="form-control" name="image" accept="image/*"></div>
                 <div class="col-md-1"><label class="form-label">Checkout</label><input type="time" class="form-control" name="checkout_time" value="{{ old('checkout_time', '12:00') }}" required></div>
                 <div class="col-md-4"><label class="form-label">Propriétaire</label><select class="form-select" name="owner_id" required><option value="">Sélectionner</option>@foreach($owners as $owner)<option value="{{ $owner->id }}" @selected((string) old('owner_id') === (string) $owner->id)>{{ $owner->name }} ({{ $owner->email }})</option>@endforeach</select></div>
@@ -104,19 +111,20 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Hôtel</th><th>Ville</th><th>Téléphone</th><th>Checkout</th><th>Propriétaire</th><th>Email</th></tr></thead>
+            <thead class="table-light"><tr><th>Hôtel</th><th>Ville</th><th>Téléphone</th><th>Devise</th><th>Checkout</th><th>Propriétaire</th><th>Email</th></tr></thead>
             <tbody>
                 @forelse($hotels as $hotel)
                     <tr>
                         <td>{{ $hotel->name }}</td>
                         <td>{{ $hotel->city }}</td>
                         <td>{{ $hotel->phone }}</td>
+                        <td>{{ $hotel->currency ?? 'FC' }}</td>
                         <td>{{ $hotel->checkout_time }}</td>
                         <td>{{ $hotel->owner->name ?? '-' }}</td>
                         <td>{{ $hotel->owner->email ?? '-' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="text-center text-muted">Aucun hôtel pour le moment.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted">Aucun hôtel pour le moment.</td></tr>
                 @endforelse
             </tbody>
         </table>

@@ -119,8 +119,8 @@
                     <td>{{ $reservation->room->number }}</td>
                     <td>{{ $expectedNights }}</td>
                     <td>{{ $actualNights }}</td>
-                    <td class="right">{{ number_format($pricePerNight, 2) }}</td>
-                    <td class="right">{{ number_format($totalAmount, 2) }}</td>
+                    <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
+                    <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -141,11 +141,11 @@
             <tbody>
                 <tr>
                     <td><strong>Déjà payé</strong></td>
-                    <td class="right"><strong>{{ number_format($paidAmount, 2) }}</strong></td>
+                    <td class="right"><strong>{{ \App\Support\Money::format($paidAmount, $currency) }}</strong></td>
                 </tr>
                 <tr>
                     <td><strong>Solde (reste à payer)</strong></td>
-                    <td class="right"><strong>{{ number_format($remainingAmount, 2) }}</strong></td>
+                    <td class="right"><strong>{{ \App\Support\Money::format($remainingAmount, $currency) }}</strong></td>
                 </tr>
             </tbody>
         </table>
@@ -166,7 +166,7 @@
             @forelse($reservation->payments->sortByDesc('created_at') as $payment)
                 <tr>
                     <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
-                    <td class="right">{{ number_format($payment->amount, 2) }}</td>
+                    <td class="right">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
                     <td>{{ ['cash' => 'Cash', 'mobile' => 'Mobile money', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
                     <td>{{ $payment->user?->name ?? '-' }}</td>
                 </tr>

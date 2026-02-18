@@ -29,7 +29,7 @@ class CashboxController extends Controller
         $totalIn = (float) $payments->sum('amount');
         $totalOut = (float) $expenses->sum('amount');
 
-        return view('cashbox.index', compact('payments', 'expenses', 'totalIn', 'totalOut', 'from', 'to'));
+        return view('cashbox.index', compact('payments', 'expenses', 'totalIn', 'totalOut', 'from', 'to', 'hotel'));
     }
 
     public function exportPdf(Request $request)

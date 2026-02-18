@@ -17,6 +17,7 @@ class Hotel extends Model
         'address',
         'city',
         'phone',
+        'currency',
         'image',
         'checkout_time',
     ];

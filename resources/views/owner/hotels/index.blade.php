@@ -21,6 +21,12 @@
                 <div class="col-md-3"><input class="form-control" name="address" placeholder="Adresse" value="{{ $hotel->address ?? '' }}"></div>
                 <div class="col-md-2"><input class="form-control" name="city" placeholder="Ville" value="{{ $hotel->city ?? '' }}"></div>
                 <div class="col-md-2"><input class="form-control" name="phone" placeholder="Téléphone" value="{{ $hotel->phone ?? '' }}"></div>
+                <div class="col-md-1">
+                    <select class="form-select" name="currency" required>
+                        <option value="FC" @selected(($hotel->currency ?? 'FC') === 'FC')>FC</option>
+                        <option value="USD" @selected(($hotel->currency ?? 'FC') === 'USD')>Dollar</option>
+                    </select>
+                </div>
                 <div class="col-md-2"><input class="form-control" type="file" name="image" accept="image/*"></div>
                 <div class="col-md-1"><input class="form-control" type="time" name="checkout_time" value="{{ $hotel->checkout_time ?? '12:00' }}" required></div>
                 <div class="col-md-1"><button class="btn btn-primary w-100">Enregistrer</button></div>

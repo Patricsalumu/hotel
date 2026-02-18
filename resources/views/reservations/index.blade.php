@@ -236,6 +236,7 @@
     @endif
 
     @php
+        $currency = $hotel->currency ?? 'FC';
         $pageTotalAmount = $reservations->sum('total_amount');
         $pagePaidAmount = $reservations->sum(fn ($reservation) => $reservation->payments->sum('amount'));
         $pageRemainingAmount = max(0, $pageTotalAmount - $pagePaidAmount);
@@ -243,9 +244,9 @@
 
     <div class="row g-2 mb-3">
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Réservations (page)</div><div class="rv-kpi-value">{{ $reservations->count() }}</div></div></div>
-        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Montant total</div><div class="rv-kpi-value">{{ number_format($pageTotalAmount, 2) }}</div></div></div>
-        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Total payé</div><div class="rv-kpi-value text-success">{{ number_format($pagePaidAmount, 2) }}</div></div></div>
-        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Reste à payer</div><div class="rv-kpi-value text-danger">{{ number_format($pageRemainingAmount, 2) }}</div></div></div>
+        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Montant total</div><div class="rv-kpi-value">{{ \App\Support\Money::format($pageTotalAmount, $currency) }}</div></div></div>
+        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Total payé</div><div class="rv-kpi-value text-success">{{ \App\Support\Money::format($pagePaidAmount, $currency) }}</div></div></div>
+        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Reste à payer</div><div class="rv-kpi-value text-danger">{{ \App\Support\Money::format($pageRemainingAmount, $currency) }}</div></div></div>
     </div>
 
     <div class="gh-card card mb-3">
@@ -357,9 +358,9 @@
                     <td>{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $reservation->actual_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $nights }}</td>
-                    <td><span class="fw-semibold">{{ number_format($reservation->total_amount,2) }}</span></td>
-                    <td><span class="text-success fw-semibold">{{ number_format($paid,2) }}</span></td>
-                    <td><span class="text-danger fw-semibold">{{ number_format($remaining,2) }}</span></td>
+                    <td><span class="fw-semibold">{{ \App\Support\Money::format($reservation->total_amount, $currency) }}</span></td>
+                    <td><span class="text-success fw-semibold">{{ \App\Support\Money::format($paid, $currency) }}</span></td>
+                    <td><span class="text-danger fw-semibold">{{ \App\Support\Money::format($remaining, $currency) }}</span></td>
                     <td>
                         <div class="rv-inline-tools">
                         <span class="badge text-bg-{{ $reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info') }}">{{ ['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status }}</span>

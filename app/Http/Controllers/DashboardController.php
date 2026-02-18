@@ -39,7 +39,9 @@ class DashboardController extends Controller
             ->orderBy('order_index')
             ->get();
 
-        $clients = Client::orderBy('name')->get();
+        $clients = Client::where('hotel_id', $hotel->id)
+            ->orderBy('name')
+            ->get();
 
         return view('dashboard', compact(
             'hotel',

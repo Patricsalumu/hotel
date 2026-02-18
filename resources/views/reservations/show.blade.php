@@ -15,6 +15,7 @@
 
     <div class="row g-3">
         @php
+            $currency = $reservation->room->apartment->hotel->currency ?? 'FC';
             $paidAmount = $reservation->payments->sum('amount');
             $remainingAmount = max(0, (float) $reservation->total_amount - (float) $paidAmount);
         @endphp
@@ -26,9 +27,9 @@
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Date d’arrivée</div><div class="fw-semibold">{{ $reservation->checkin_date?->format('Y-m-d') }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ prévu</div><div class="fw-semibold">{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ réel</div><div class="fw-semibold">{{ $reservation->actual_checkout_date?->format('Y-m-d') ?? '-' }}</div></div></div>
-                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total</div><div class="gh-kpi-value">{{ number_format($reservation->total_amount,2) }}</div></div></div>
-                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Montant déjà payé</div><div class="gh-kpi-value text-success">{{ number_format($paidAmount,2) }}</div></div></div>
-                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Reste à payer</div><div class="gh-kpi-value text-danger">{{ number_format($remainingAmount,2) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total</div><div class="gh-kpi-value">{{ \App\Support\Money::format($reservation->total_amount, $currency) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Montant déjà payé</div><div class="gh-kpi-value text-success">{{ \App\Support\Money::format($paidAmount, $currency) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Reste à payer</div><div class="gh-kpi-value text-danger">{{ \App\Support\Money::format($remainingAmount, $currency) }}</div></div></div>
                     <div class="col-md-12"><div class="gh-kpi h-100"><div class="gh-kpi-label">Réservation créée par</div><div class="fw-semibold">{{ $reservation->user?->name ?? $reservation->manager?->name ?? '-' }}</div></div></div>
                 </div>
             </div></div>
@@ -49,7 +50,7 @@
                         @forelse($reservation->payments->sortByDesc('created_at') as $payment)
                             <tr>
                                 <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
-                                <td class="fw-semibold">{{ number_format($payment->amount,2) }}</td>
+                                <td class="fw-semibold">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
                                 <td>{{ ['cash' => 'Cash', 'mobile' => 'Mobile money', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
                                 <td>{{ $payment->user?->name ?? '-' }}</td>
                             </tr>

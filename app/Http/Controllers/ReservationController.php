@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Reservation;
 use App\Models\Room;
 use App\Services\ReservationBillingService;
+use App\Support\Money;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -21,6 +22,7 @@ class ReservationController extends Controller
     public function index(Request $request)
     {
         $hotel = $request->user()->currentHotel();
+        $currency = $hotel->currency ?? 'FC';
 
         $query = Reservation::query()
             ->with(['client', 'room.apartment', 'payments'])
@@ -71,17 +73,17 @@ class ReservationController extends Controller
         $sharePageText = $latestOccupiedLine . "\n" .
             "Chambres occupées : " . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'aucune') . "\n" .
             "Chambres libres : " . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'aucune') . "\n" .
-            "Total Entrées du Jour : " . number_format($todayReceived, 2) . "\n" .
-            "Total Sorties du Jour : " . number_format($todayExpenses, 2) . "\n" .
-            "Solde : " . number_format($balance, 2);
+            "Total Entrées du Jour : " . Money::format($todayReceived, $currency) . "\n" .
+            "Total Sorties du Jour : " . Money::format($todayExpenses, $currency) . "\n" .
+            "Solde : " . Money::format($balance, $currency);
 
         $sharePageMessage = "📢 *Notification {$hotel->name}*\n\n";
         $sharePageMessage .= $latestOccupiedLine . "\n\n";
         $sharePageMessage .= "*Chambres occupées*\n" . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'Aucune') . "\n\n";
         $sharePageMessage .= "*Chambres libres*\n" . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'Aucune') . "\n\n";
-        $sharePageMessage .= "Total Entrées du Jour : " . number_format($todayReceived, 2) . "\n";
-        $sharePageMessage .= "Total Sorties du Jour : " . number_format($todayExpenses, 2) . "\n";
-        $sharePageMessage .= "Solde : " . number_format($balance, 2) . "\n\n";
+        $sharePageMessage .= "Total Entrées du Jour : " . Money::format($todayReceived, $currency) . "\n";
+        $sharePageMessage .= "Total Sorties du Jour : " . Money::format($todayExpenses, $currency) . "\n";
+        $sharePageMessage .= "Solde : " . Money::format($balance, $currency) . "\n\n";
         $sharePageMessage .= "— Informatisée par Ayanna ERP";
 
         $whatsAppPhone = preg_replace('/\D+/', '', (string) $hotel->phone);
@@ -255,6 +257,7 @@ class ReservationController extends Controller
         ]);
 
         $hotel = $reservation->room->apartment->hotel;
+        $currency = $hotel->currency ?? 'FC';
         $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
 
         $paidAmount = (float) $reservation->payments->sum('amount');
@@ -294,6 +297,7 @@ class ReservationController extends Controller
             'actualNights',
             'pricePerNight',
             'paymentStatusLabel',
+            'currency',
             'logoDataUri'
         ));
 

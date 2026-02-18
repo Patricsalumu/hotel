@@ -21,6 +21,9 @@
     @if(!$hotel)
         <div class="alert alert-warning">Aucun hôtel configuré pour ce compte.</div>
     @else
+        @php
+            $currency = $hotel->currency ?? 'FC';
+        @endphp
         <div class="row g-3 mb-4">
             <div class="col-md-3">
                 <div class="gh-kpi h-100">
@@ -43,8 +46,8 @@
             <div class="col-md-3">
                 <div class="gh-kpi h-100">
                     <div class="gh-kpi-label">Encaissement du jour</div>
-                    <div class="gh-kpi-value">{{ number_format($todayIncome,2) }}</div>
-                    <div class="small text-muted">Dépenses: {{ number_format($todayExpenses,2) }}</div>
+                    <div class="gh-kpi-value">{{ \App\Support\Money::format($todayIncome, $currency) }}</div>
+                    <div class="small text-muted">Dépenses: {{ \App\Support\Money::format($todayExpenses, $currency) }}</div>
                 </div>
             </div>
         </div>

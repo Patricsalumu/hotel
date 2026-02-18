@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreHotelRequest extends FormRequest
 {
@@ -26,6 +27,7 @@ class StoreHotelRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'currency' => ['required', Rule::in(['FC', 'USD'])],
             'image' => ['nullable', 'image', 'max:2048'],
             'checkout_time' => ['required', 'date_format:H:i'],
         ];
