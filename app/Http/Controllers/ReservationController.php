@@ -141,6 +141,7 @@ class ReservationController extends Controller
             'client_id' => $request->integer('client_id'),
             'room_id' => $room->id,
             'manager_id' => $request->user()->id,
+            'id_user' => $request->user()->id,
             'checkin_date' => $request->date('checkin_date'),
             'expected_checkout_date' => $expectedCheckoutDate,
             'status' => $initialStatus,
@@ -189,7 +190,7 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation)
     {
-        $reservation->load(['client', 'room.apartment.hotel', 'payments', 'manager']);
+        $reservation->load(['client', 'room.apartment.hotel', 'payments.user', 'manager', 'user']);
         return view('reservations.show', compact('reservation'));
     }
 

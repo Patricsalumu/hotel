@@ -25,6 +25,7 @@ class PaymentController extends Controller
 
         Payment::create([
             'reservation_id' => $reservation->id,
+            'id_user' => $request->user()->id,
             'amount' => $amount,
             'payment_method' => $request->string('payment_method')->toString(),
             'created_at' => now(),

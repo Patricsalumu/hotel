@@ -16,6 +16,7 @@ class Reservation extends Model
         'client_id',
         'room_id',
         'manager_id',
+        'id_user',
         'checkin_date',
         'expected_checkout_date',
         'actual_checkout_date',
@@ -44,6 +45,11 @@ class Reservation extends Model
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'id_user');
     }
 
     public function payments(): HasMany

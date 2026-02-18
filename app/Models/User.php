@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Models\Payment;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -61,6 +62,16 @@ class User extends Authenticatable
     public function managedReservations(): HasMany
     {
         return $this->hasMany(Reservation::class, 'manager_id');
+    }
+
+    public function createdReservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'id_user');
+    }
+
+    public function receivedPayments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'id_user');
     }
 
     public function expenses(): HasMany
