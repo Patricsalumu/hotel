@@ -36,7 +36,51 @@ class ReservationController extends Controller
             ->orderBy('number')
             ->get();
 
-        return view('reservations.index', compact('reservations', 'clients', 'availableRooms', 'hotel'));
+        // build auxiliary data for sharing
+        $availableNumbers = $availableRooms->pluck('number')->toArray();
+
+        $occupiedRooms = Room::where('status', 'occupied')
+            ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+            ->orderBy('number')
+            ->get();
+        $occupiedNumbers = $occupiedRooms->pluck('number')->toArray();
+
+        // total received today for the filtered reservations (payments)
+        $reservationsForTotals = $reservations->getCollection();
+        $todayReceived = $reservationsForTotals->sum(fn ($r) => $r->payments->sum('amount'));
+
+        // expenses today
+        $todayExpenses = \App\Models\Expense::whereDate('created_at', today())->sum('amount');
+        $balance = $todayReceived - $todayExpenses;
+
+        $sharePageText = "Chambres occupées : " . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'aucune') . "\n" .
+            "Chambres libres : " . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'aucune') . "\n" .
+            "Total reçu aujourd'hui : " . number_format($todayReceived, 2) . "\n" .
+            "Total dépenses aujourd'hui : " . number_format($todayExpenses, 2) . "\n" .
+            "Solde : " . number_format($balance, 2);
+        // prepare calendar-friendly reservations data to avoid Blade parsing issues
+        $calendarReservations = $reservations->getCollection()->map(fn ($r) => [
+            'id' => $r->id,
+            'room_number' => $r->room->number,
+            'client_name' => $r->client->name,
+            'checkin' => $r->checkin_date?->format('Y-m-d'),
+            'checkout' => $r->expected_checkout_date?->format('Y-m-d'),
+            'status' => $r->status,
+        ])->values()->toArray();
+
+        return view('reservations.index', compact(
+            'reservations',
+            'clients',
+            'availableRooms',
+            'hotel',
+            'sharePageText',
+            'availableNumbers',
+            'occupiedNumbers',
+            'todayReceived',
+            'todayExpenses',
+            'balance',
+            'calendarReservations'
+        ));
     }
 
     public function store(StoreReservationRequest $request)
@@ -54,13 +98,27 @@ class ReservationController extends Controller
             ? Carbon::parse($request->date('expected_checkout_date'))->toDateString()
             : Carbon::parse($request->date('checkin_date'))->toDateString();
 
+        // determine initial reservation status based on checkin date relative to today
+        $checkinDate = Carbon::parse($request->date('checkin_date'))->toDateString();
+        $today = Carbon::today()->toDateString();
+
+        if ($checkinDate === $today) {
+            // checkin happening today -> mark occupied
+            $initialStatus = 'checked_in';
+            $roomStatus = 'occupied';
+        } else {
+            // past or future check‑in should simply be reserved until the day arrives
+            $initialStatus = 'reserved';
+            $roomStatus = 'reserved';
+        }
+
         $reservation = Reservation::create([
             'client_id' => $request->integer('client_id'),
             'room_id' => $room->id,
             'manager_id' => $request->user()->id,
             'checkin_date' => $request->date('checkin_date'),
             'expected_checkout_date' => $expectedCheckoutDate,
-            'status' => $request->input('status', 'reserved'),
+            'status' => $initialStatus,
             'payment_status' => 'unpaid',
             'total_amount' => 0,
         ]);
@@ -71,7 +129,7 @@ class ReservationController extends Controller
         ]);
 
         $room->update([
-            'status' => $reservation->status === 'checked_in' ? 'occupied' : 'occupied',
+            'status' => $roomStatus,
         ]);
         $availableRooms = Room::where('status', 'available')
             ->whereHas('apartment', fn($q) =>
@@ -101,11 +159,7 @@ class ReservationController extends Controller
 
         return redirect()
             ->route('reservations.index')
-            ->with('success', 'Réservation enregistrée avec succès.')
-            ->with('share_text', $this->billingService->shareSummary(
-                $reservation->fresh('room', 'client'),
-                $hotel
-            ));
+            ->with('success', 'Réservation enregistrée avec succès.');
     }
 
     public function show(Reservation $reservation)

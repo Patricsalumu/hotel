@@ -54,6 +54,120 @@
             flex-wrap: wrap;
             min-width: 210px;
         }
+        /* Ensure action buttons are always visible and accessible */
+        .rv-actions form {
+            display: inline-block;
+            margin: 0;
+        }
+
+        .rv-actions > * {
+            display: inline-block !important;
+            margin-right: .4rem;
+        }
+
+        .rv-actions .btn {
+            padding: .35rem .5rem;
+            font-size: .85rem;
+            min-width: 56px;
+        }
+
+        /* Calendar styles */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .calendar-header {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .calendar-header div {
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 4px;
+        }
+
+        .calendar-day {
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 8px;
+            min-height: 100px;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .calendar-day:hover {
+            background: #f9fafb;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .calendar-day.other-month {
+            background: #f9fafb;
+            color: #9ca3af;
+        }
+
+        .calendar-day.today {
+            background: #dbeafe;
+            border-color: #3b82f6;
+        }
+
+        .calendar-day-number {
+            font-weight: bold;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+
+        .calendar-reservations {
+            font-size: 0.75rem;
+        }
+
+        .calendar-reservation-item {
+            background: #fecaca;
+            border-left: 3px solid #dc2626;
+            padding: 2px 4px;
+            margin-bottom: 2px;
+            border-radius: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .calendar-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .view-toggle {
+            display: flex;
+            gap: 5px;
+        }
+
+        .view-toggle button {
+            padding: 6px 12px;
+            border: 1px solid #d1d5db;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .view-toggle button.active {
+            background: #3b82f6;
+            color: #fff;
+            border-color: #3b82f6;
+        }
 
         @media (max-width: 575.98px) {
             .rv-kpi-value {
@@ -62,6 +176,16 @@
 
             .rv-actions {
                 min-width: 180px;
+            }
+
+            .calendar-grid {
+                grid-template-columns: repeat(7, 1fr);
+                gap: 4px;
+            }
+
+            .calendar-day {
+                min-height: 80px;
+                padding: 4px;
             }
         }
     </style>
@@ -77,10 +201,16 @@
     </x-slot>
 
     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
-    @if(session('share_text'))
+
+    {{-- shared summary for the current page/filter --}}
+    @if(!empty($sharePageText))
         <div class="alert alert-info d-flex justify-content-between align-items-center gap-2 gh-mobile-stack">
-            <span id="shareText">{{ session('share_text') }}</span>
+            <span id="shareText">{{ $sharePageText }}</span>
             <div class="d-flex gap-2 gh-mobile-stack">
+                <a class="btn btn-sm btn-outline-success" target="_blank"
+                   href="https://web.whatsapp.com/send?text={{ urlencode($sharePageText) }}">
+                    WhatsApp
+                </a>
                 <button class="btn btn-sm btn-outline-primary" 
                     onclick="navigator.share ? navigator.share({text: document.getElementById('shareText').innerText}) : alert('Partage non supporté')">
                     Partager
@@ -134,9 +264,36 @@
     <div class="gh-card card mb-3">
         <div class="card-body d-flex justify-content-between align-items-center gap-2 gh-mobile-stack">
             <div class="fw-semibold">Créer une réservation</div>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createReservationModal">Nouvelle réservation</button>
+            <div class="view-toggle">
+                <button class="view-btn active" data-view="table">Tableau</button>
+                <button class="view-btn" data-view="calendar">Calendrier</button>
+            </div>
         </div>
     </div>
+
+    <!-- Calendrier -->
+    <div id="calendarView" class="gh-card card mb-3 d-none">
+        <div class="card-body">
+            <div class="calendar-controls">
+                <button id="prevMonth" class="btn btn-sm btn-outline-secondary">← Mois précédent</button>
+                <h5 id="monthYear" class="mb-0"></h5>
+                <button id="nextMonth" class="btn btn-sm btn-outline-secondary">Mois suivant →</button>
+            </div>
+            <div class="calendar-header">
+                <div>Dim</div>
+                <div>Lun</div>
+                <div>Mar</div>
+                <div>Mer</div>
+                <div>Jeu</div>
+                <div>Ven</div>
+                <div>Sam</div>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+    </div>
+
+    <!-- Tableau -->
+    <div id="tableView">
 
     <div class="modal fade" id="createReservationModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
@@ -198,6 +355,20 @@
                         <a class="btn btn-sm btn-outline-primary" href="{{ route('reservations.show',$reservation) }}">Voir</a>
                         <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success">Check-in</button></form>
                         <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger">Check-out</button></form>
+                        @php
+                            $rowShare = "Chambre {$reservation->room->number} occupée le " . ($reservation->checkin_date?->format('Y-m-d') ?? '')
+                                . " ; checkout prévu " . ($reservation->expected_checkout_date?->format('Y-m-d') ?? '') . ".\n";
+                            $rowShare .= "Chambres libres: " . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'aucune') . "\n";
+                            $rowShare .= "Chambres occupées: " . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'aucune') . "\n";
+                            $rowShare .= "Total reçu aujourd'hui: " . number_format($todayReceived,2) . "\n";
+                            $rowShare .= "Total dépenses aujourd'hui: " . number_format($todayExpenses,2) . "\n";
+                            $rowShare .= "Solde: " . number_format($balance,2);
+                        @endphp
+                        <!-- Visible fallback WhatsApp button (inline styles to avoid CSS override) -->
+                        <a class="btn btn-sm" target="_blank" href="https://web.whatsapp.com/send?text={{ urlencode($rowShare) }}" title="Partager sur WhatsApp"
+                           style="background:#25D366;color:#ffffff;border-radius:6px;padding:.4rem .6rem;display:inline-block;margin-right:.4rem;min-width:120px;text-align:center;">
+                            📱 Partager sur WhatsApp
+                        </a>
                     </td>
                 </tr>
             @empty
@@ -211,4 +382,106 @@
         </table>
     </div>
     <div class="mt-3">{{ $reservations->links() }}</div>
+    </div>
+
+    <script>
+        // Calendar state
+        let currentMonth = new Date();
+        const reservations = @json($calendarReservations ?? []);
+
+        function renderCalendar() {
+            const year = currentMonth.getFullYear();
+            const month = currentMonth.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const prevLastDay = new Date(year, month, 0);
+            
+            document.getElementById('monthYear').textContent = `${['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][month]} ${year}`;
+            
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            const startDate = firstDay.getDay();
+            for (let i = startDate - 1; i >= 0; i--) {
+                const day = prevLastDay.getDate() - i;
+                const cell = createDayCell(day, true);
+                grid.appendChild(cell);
+            }
+            
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const date = new Date(year, month, day);
+                const cell = createDayCell(day, false, date);
+                grid.appendChild(cell);
+            }
+            
+            for (let day = 1; grid.children.length % 7 !== 0; day++) {
+                const cell = createDayCell(day, true);
+                grid.appendChild(cell);
+            }
+        }
+        
+        function createDayCell(day, isOtherMonth, date = null) {
+            const cell = document.createElement('div');
+            cell.className = 'calendar-day';
+            
+            if (isOtherMonth) {
+                cell.classList.add('other-month');
+            }
+            
+            if (date) {
+                const today = new Date();
+                if (date.toDateString() === today.toDateString()) {
+                    cell.classList.add('today');
+                }
+                
+                const dateStr = date.toISOString().split('T')[0];
+                const dayReservations = reservations.filter(r => {
+                    const checkin = new Date(r.checkin);
+                    const checkout = new Date(r.checkout);
+                    return date >= checkin && date <= checkout;
+                });
+                
+                let html = `<div class="calendar-day-number">${day}</div>`;
+                if (dayReservations.length > 0) {
+                    html += '<div class="calendar-reservations">';
+                    dayReservations.forEach(res => {
+                        html += `<div class="calendar-reservation-item" title="Chambre ${res.room_number} - ${res.client_name}">📋 Chambre ${res.room_number}</div>`;
+                    });
+                    html += '</div>';
+                }
+                cell.innerHTML = html;
+            } else {
+                cell.textContent = day;
+            }
+            
+            return cell;
+        }
+        
+        // View toggle
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                const view = this.dataset.view;
+                document.getElementById('tableView').classList.toggle('d-none', view !== 'table');
+                document.getElementById('calendarView').classList.toggle('d-none', view !== 'calendar');
+                
+                if (view === 'calendar') {
+                    renderCalendar();
+                }
+            });
+        });
+        
+        document.getElementById('prevMonth').addEventListener('click', () => {
+            currentMonth.setMonth(currentMonth.getMonth() - 1);
+            renderCalendar();
+        });
+        
+        document.getElementById('nextMonth').addEventListener('click', () => {
+            currentMonth.setMonth(currentMonth.getMonth() + 1);
+            renderCalendar();
+        });
+    </script>
+
 </x-app-layout>
