@@ -5,7 +5,11 @@
                 <h4 class="mb-1">Détails réservation #{{ $reservation->id }}</h4>
                 <div class="small text-white-50">Informations séjour et encaissement</div>
             </div>
-            <a href="{{ route('reservations.index') }}" class="btn btn-sm btn-light">Retour aux réservations</a>
+            <div class="d-flex gap-2">
+                <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}" class="btn btn-sm btn-outline-light">Télécharger A4</a>
+                <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}" class="btn btn-sm btn-outline-light">Télécharger 80mm</a>
+                <a href="{{ route('reservations.index') }}" class="btn btn-sm btn-light">Retour aux réservations</a>
+            </div>
         </div>
     </x-slot>
 

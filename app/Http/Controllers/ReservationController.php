@@ -234,6 +234,70 @@ class ReservationController extends Controller
         return $pdf->download('reservations-report.pdf');
     }
 
+    public function invoicePdf(Request $request, Reservation $reservation)
+    {
+        $this->authorize('view', $reservation);
+
+        $reservation->load([
+            'client',
+            'room.apartment.hotel',
+            'payments.user',
+            'user',
+            'manager',
+        ]);
+
+        $hotel = $reservation->room->apartment->hotel;
+        $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
+
+        $paidAmount = (float) $reservation->payments->sum('amount');
+        $totalAmount = (float) $reservation->total_amount;
+        $remainingAmount = max(0, $totalAmount - $paidAmount);
+
+        $expectedNights = $reservation->expected_checkout_date
+            ? max(1, $reservation->checkin_date->diffInDays($reservation->expected_checkout_date))
+            : 1;
+
+        $actualNights = $reservation->computeNights(now(), $hotel->checkout_time);
+        $pricePerNight = $actualNights > 0 ? round($totalAmount / $actualNights, 2) : $totalAmount;
+
+        $paymentStatusLabel = [
+            'paid' => 'PAYÉ',
+            'partial' => 'PARTIEL',
+            'unpaid' => 'NON PAYÉ',
+        ][$reservation->payment_status] ?? strtoupper($reservation->payment_status);
+
+        $logoDataUri = null;
+        if (!empty($hotel->image)) {
+            $logoPath = storage_path('app/public/' . $hotel->image);
+            if (is_file($logoPath)) {
+                $mime = mime_content_type($logoPath) ?: 'image/png';
+                $logoDataUri = 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($logoPath));
+            }
+        }
+
+        $pdf = Pdf::loadView('pdf.invoice', compact(
+            'reservation',
+            'hotel',
+            'paper',
+            'paidAmount',
+            'totalAmount',
+            'remainingAmount',
+            'expectedNights',
+            'actualNights',
+            'pricePerNight',
+            'paymentStatusLabel',
+            'logoDataUri'
+        ));
+
+        if ($paper === '80mm') {
+            $pdf->setPaper([0, 0, 226.77, 900], 'portrait');
+        } else {
+            $pdf->setPaper('a4', 'portrait');
+        }
+
+        return $pdf->download('facture-reservation-' . $reservation->id . '-' . $paper . '.pdf');
+    }
+
     private function applyFilters($query, Request $request): void
     {
         if ($request->filled('from_date') && $request->filled('to_date')) {

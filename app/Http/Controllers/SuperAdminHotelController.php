@@ -27,9 +27,14 @@ class SuperAdminHotelController extends Controller
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'image' => ['nullable', 'image', 'max:2048'],
             'checkout_time' => ['required', 'date_format:H:i'],
             'owner_id' => ['required', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'owner'))],
         ]);
+
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('hotels/logos', 'public');
+        }
 
         DB::transaction(function () use ($data) {
             $hotel = Hotel::create([
@@ -38,6 +43,7 @@ class SuperAdminHotelController extends Controller
                 'address' => $data['address'] ?? null,
                 'city' => $data['city'] ?? null,
                 'phone' => $data['phone'] ?? null,
+                'image' => $data['image'] ?? null,
                 'checkout_time' => $data['checkout_time'],
             ]);
 

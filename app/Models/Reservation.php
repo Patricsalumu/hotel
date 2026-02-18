@@ -12,6 +12,15 @@ class Reservation extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::creating(function (Reservation $reservation): void {
+            if (empty($reservation->id_user) && auth()->check()) {
+                $reservation->id_user = auth()->id();
+            }
+        });
+    }
+
     protected $fillable = [
         'client_id',
         'room_id',

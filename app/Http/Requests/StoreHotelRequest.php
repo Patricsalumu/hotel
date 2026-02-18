@@ -26,6 +26,7 @@ class StoreHotelRequest extends FormRequest
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:100'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'image' => ['nullable', 'image', 'max:2048'],
             'checkout_time' => ['required', 'date_format:H:i'],
         ];
     }

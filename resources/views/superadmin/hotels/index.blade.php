@@ -60,12 +60,13 @@
     <div class="gh-card card mb-3" id="card-create-hotel">
         <div class="card-header">Créer un hôtel</div>
         <div class="card-body">
-            <form method="POST" action="{{ route('superadmin.hotels.store') }}" class="row g-2">
+            <form method="POST" action="{{ route('superadmin.hotels.store') }}" class="row g-2" enctype="multipart/form-data">
                 @csrf
                 <div class="col-md-4"><label class="form-label">Nom hôtel</label><input class="form-control" name="hotel_name" value="{{ old('hotel_name') }}" required></div>
                 <div class="col-md-3"><label class="form-label">Adresse</label><input class="form-control" name="address" value="{{ old('address') }}"></div>
                 <div class="col-md-2"><label class="form-label">Ville</label><input class="form-control" name="city" value="{{ old('city') }}"></div>
                 <div class="col-md-2"><label class="form-label">Téléphone</label><input class="form-control" name="phone" value="{{ old('phone') }}"></div>
+                <div class="col-md-2"><label class="form-label">Logo</label><input type="file" class="form-control" name="image" accept="image/*"></div>
                 <div class="col-md-1"><label class="form-label">Checkout</label><input type="time" class="form-control" name="checkout_time" value="{{ old('checkout_time', '12:00') }}" required></div>
                 <div class="col-md-4"><label class="form-label">Propriétaire</label><select class="form-select" name="owner_id" required><option value="">Sélectionner</option>@foreach($owners as $owner)<option value="{{ $owner->id }}" @selected((string) old('owner_id') === (string) $owner->id)>{{ $owner->name }} ({{ $owner->email }})</option>@endforeach</select></div>
                 <div class="col-12 d-flex justify-content-end"><button class="btn gh-btn-primary btn-primary">Créer hôtel</button></div>

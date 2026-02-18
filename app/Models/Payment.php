@@ -10,6 +10,15 @@ class Payment extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::creating(function (Payment $payment): void {
+            if (empty($payment->id_user) && auth()->check()) {
+                $payment->id_user = auth()->id();
+            }
+        });
+    }
+
     public $timestamps = false;
 
     protected $fillable = [

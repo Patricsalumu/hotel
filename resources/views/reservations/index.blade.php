@@ -359,6 +359,8 @@
                         <span class="badge text-bg-{{ $reservation->payment_status === 'paid' ? 'success' : ($reservation->payment_status === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$reservation->payment_status] ?? $reservation->payment_status }}</span>
                     </td>
                     <td class="rv-actions">
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}">Télécharger A4</a>
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}">Télécharger 80mm</a>
                         @if($remaining > 0)
                             <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#paymentModal{{ $reservation->id }}">Payer</button>
                         @else

@@ -42,6 +42,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('reservations', ReservationController::class)->only(['index', 'store', 'show', 'update']);
     Route::get('/reports/reservations/pdf', [ReservationController::class, 'exportPdf'])->name('reports.reservations.pdf');
+    Route::get('/reservations/{reservation}/invoice', [ReservationController::class, 'invoicePdf'])->name('reservations.invoice.pdf');
 
     Route::resource('clients', ClientController::class)->only(['index', 'store', 'show']);
 
