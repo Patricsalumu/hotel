@@ -3,16 +3,13 @@
 <head>
     <meta charset="utf-8">
     <style>
-        body {
-            font-family: DejaVu Sans, sans-serif;
-            color: #111;
-        }
+        body { font-family: DejaVu Sans, sans-serif; color: #111; }
         body.paper-a4 {
             font-size: 12px;
             margin: 18px;
         }
         body.paper-80 {
-            font-size: 10px;
+            font-size: 11px;
             margin: 6px;
         }
         .title {
@@ -20,10 +17,34 @@
             margin-bottom: 4px;
         }
         .paper-a4 .title {
-            font-size: 18px;
+            font-size: 16px;
+        }
+        .paper-80 .label {
+            font-size: 12px;
         }
         .paper-80 .title {
-            font-size: 13px;
+            font-size: 15px;
+        }
+        .header {
+            border-bottom: 2px solid #222;
+            padding-bottom: 10px;
+            margin-bottom: 14px;
+        }
+        .company-name {
+            font-weight: 700;
+        }
+        .paper-a4 .company-name {
+            font-size: 18px;
+        }
+        .paper-80 .company-name {
+            font-size: 16px;
+        }
+        .company-meta {
+            color: #444;
+            margin-top: 2px;
+        }
+        .paper-80 .company-meta {
+            margin-top: 1px;
         }
         .status {
             font-weight: 700;
@@ -32,8 +53,15 @@
             display: inline-block;
             margin-bottom: 10px;
         }
-        .header, .block {
+        .paper-80 .status {
+            padding: 2px 6px;
+            margin-bottom: 6px;
+        }
+        .block {
             margin-bottom: 10px;
+        }
+        .paper-80 .block {
+            margin-bottom: 7px;
         }
         .row {
             margin-bottom: 4px;
@@ -71,11 +99,19 @@
             font-size: 11px;
         }
         .paper-80 .small {
-            font-size: 9px;
+            font-size: 10px;
         }
         .separator {
             border-top: 1px dashed #999;
             margin: 10px 0;
+        }
+        .paper-80 th,
+        .paper-80 td {
+            padding: 4px;
+        }
+        .paper-80 .footer {
+            margin-top: 8px;
+            padding-top: 6px;
         }
     </style>
 </head>
@@ -85,12 +121,12 @@
         @if(!empty($logoDataUri))
             <img src="{{ $logoDataUri }}" class="logo" alt="Logo">
         @endif
+        <div class="company-name">{{ $hotel->name }}</div>
+        <div class="company-meta">Adresse: {{ trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? '')) ?: '-' }}</div>
+        <div class="company-meta">Téléphone: {{ $hotel->phone ?: '-' }} | Mail: {{ $hotel->owner?->email ?? '-' }}</div>
+
         <div class="title">Facture N° {{ $reservation->id }}</div>
         <div class="status">{{ $paymentStatusLabel }}</div>
-
-        <div class="row"><span class="label">Entreprise :</span> {{ $hotel->name }}</div>
-        <div class="row"><span class="label">Téléphone :</span> {{ $hotel->phone ?: '-' }}</div>
-        <div class="row"><span class="label">Adresse :</span> {{ trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? '')) ?: '-' }}</div>
     </div>
 
     <div class="block">
@@ -102,28 +138,51 @@
 
     <div class="block">
         <div class="label">Détails réservation</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Appartement</th>
-                    <th>Chambre</th>
-                    <th>Nuitée prévue</th>
-                    <th>Nuitée réelle</th>
-                    <th>Montant / nuit</th>
-                    <th>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>{{ $reservation->room->apartment->name ?? '-' }}</td>
-                    <td>{{ $reservation->room->number }}</td>
-                    <td>{{ $expectedNights }}</td>
-                    <td>{{ $actualNights }}</td>
-                    <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
-                    <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
-                </tr>
-            </tbody>
-        </table>
+        @if($paper === '80mm')
+            <table>
+                <thead>
+                    <tr>
+                        <th>Logement</th>
+                        <th>Nuitées</th>
+                        <th class="right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ ($reservation->room->apartment->name ?? '-') . ' / Ch. ' . $reservation->room->number }}</td>
+                        <td>Prévues: {{ $expectedNights }}<br>Réelles: {{ $actualNights }}</td>
+                        <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Montant / nuit</strong></td>
+                        <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        @else
+            <table>
+                <thead>
+                    <tr>
+                        <th>Appartement</th>
+                        <th>Chambre</th>
+                        <th>Nuitée prévue</th>
+                        <th>Nuitée réelle</th>
+                        <th>Montant / nuit</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ $reservation->room->apartment->name ?? '-' }}</td>
+                        <td>{{ $reservation->room->number }}</td>
+                        <td>{{ $expectedNights }}</td>
+                        <td>{{ $actualNights }}</td>
+                        <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
+                        <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        @endif
     </div>
 
     <div class="block">
@@ -153,34 +212,61 @@
 
     <div class="block">
         <div class="label">Paiements perçus</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Montant</th>
-                    <th>Mode</th>
-                    <th>Perçu par</th>
-                </tr>
-            </thead>
-            <tbody>
-            @forelse($reservation->payments->sortByDesc('created_at') as $payment)
-                <tr>
-                    <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
-                    <td class="right">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
-                    <td>{{ ['cash' => 'Cash', 'mobile' => 'Mobile money', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
-                    <td>{{ $payment->user?->name ?? '-' }}</td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="4">Aucun paiement enregistré.</td>
-                </tr>
-            @endforelse
-            </tbody>
-        </table>
+        @if($paper === '80mm')
+            <table>
+                <thead>
+                    <tr>
+                        <th>Détails</th>
+                        <th class="right">Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse($reservation->payments->sortByDesc('created_at') as $payment)
+                    <tr>
+                        <td>{{ $payment->created_at?->format('d/m H:i') }}<br>{{ ['cash' => 'Cash', 'mobile' => 'Mobile money', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}<br>{{ $payment->user?->name ?? '-' }}</td>
+                        <td class="right">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="2">Aucun paiement enregistré.</td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        @else
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Montant</th>
+                        <th>Mode</th>
+                        <th>Perçu par</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse($reservation->payments->sortByDesc('created_at') as $payment)
+                    <tr>
+                        <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
+                        <td class="right">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
+                        <td>{{ ['cash' => 'Cash', 'mobile' => 'Mobile money', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
+                        <td>{{ $payment->user?->name ?? '-' }}</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4">Aucun paiement enregistré.</td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        @endif
     </div>
 
     <div class="small">
         Généré le {{ now()->format('Y-m-d H:i') }}
+    </div>
+
+    <div class="footer" style="border-top: 1px solid #d1d5db; text-align: center;">
+        Informatisée par Ayanna ERP
     </div>
 </body>
 </html>

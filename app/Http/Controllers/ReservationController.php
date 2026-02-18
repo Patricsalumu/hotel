@@ -232,6 +232,8 @@ class ReservationController extends Controller
     {
         $this->authorize('viewAny', Reservation::class);
         $hotel = $request->user()->currentHotel();
+        $hotel->loadMissing('owner');
+
         $query = Reservation::query()
             ->with(['client', 'room', 'payments'])
             ->whereHas('room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
@@ -240,7 +242,27 @@ class ReservationController extends Controller
         $this->applyFilters($query, $request);
         $reservations = $query->get();
 
-        $pdf = Pdf::loadView('pdf.reservations', compact('reservations', 'hotel'));
+        $enterpriseEmail = $hotel->owner?->email;
+        $enterpriseAddress = trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? ''));
+        $currency = $hotel->currency ?? 'FC';
+        $logoDataUri = null;
+
+        if (!empty($hotel->image)) {
+            $logoPath = storage_path('app/public/' . $hotel->image);
+            if (is_file($logoPath)) {
+                $mime = mime_content_type($logoPath) ?: 'image/png';
+                $logoDataUri = 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($logoPath));
+            }
+        }
+
+        $pdf = Pdf::loadView('pdf.reservations', compact(
+            'reservations',
+            'hotel',
+            'currency',
+            'enterpriseEmail',
+            'enterpriseAddress',
+            'logoDataUri'
+        ));
         return $pdf->download('reservations-report.pdf');
     }
 

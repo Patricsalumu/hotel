@@ -35,6 +35,8 @@ class CashboxController extends Controller
     public function exportPdf(Request $request)
     {
         $hotel = $request->user()->currentHotel();
+        $hotel->loadMissing('owner');
+
         $from = $request->date('from_date') ?? today();
         $to = $request->date('to_date') ?? today();
 
@@ -49,7 +51,30 @@ class CashboxController extends Controller
             ->latest('created_at')
             ->get();
 
-        $pdf = Pdf::loadView('pdf.cashbox', compact('payments', 'expenses', 'hotel', 'from', 'to'));
+        $enterpriseEmail = $hotel->owner?->email;
+        $enterpriseAddress = trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? ''));
+        $currency = $hotel->currency ?? 'FC';
+        $logoDataUri = null;
+
+        if (!empty($hotel->image)) {
+            $logoPath = storage_path('app/public/' . $hotel->image);
+            if (is_file($logoPath)) {
+                $mime = mime_content_type($logoPath) ?: 'image/png';
+                $logoDataUri = 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($logoPath));
+            }
+        }
+
+        $pdf = Pdf::loadView('pdf.cashbox', compact(
+            'payments',
+            'expenses',
+            'hotel',
+            'from',
+            'to',
+            'currency',
+            'enterpriseEmail',
+            'enterpriseAddress',
+            'logoDataUri'
+        ));
         return $pdf->download('cashbox-report.pdf');
     }
 }
