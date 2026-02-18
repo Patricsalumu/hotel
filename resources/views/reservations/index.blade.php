@@ -81,8 +81,14 @@
         <div class="alert alert-info d-flex justify-content-between align-items-center gap-2 gh-mobile-stack">
             <span id="shareText">{{ session('share_text') }}</span>
             <div class="d-flex gap-2 gh-mobile-stack">
-                <button class="btn btn-sm btn-outline-primary" onclick="navigator.share ? navigator.share({text: document.getElementById('shareText').innerText}) : alert('Partage non supporté')">Partager</button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="navigator.clipboard.writeText(document.getElementById('shareText').innerText)">Copier</button>
+                <button class="btn btn-sm btn-outline-primary" 
+                    onclick="navigator.share ? navigator.share({text: document.getElementById('shareText').innerText}) : alert('Partage non supporté')">
+                    Partager
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" 
+                    onclick="navigator.clipboard.writeText(document.getElementById('shareText').innerText)">
+                    Copier
+                </button>
             </div>
         </div>
     @endif

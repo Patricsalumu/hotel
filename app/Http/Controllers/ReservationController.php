@@ -71,13 +71,41 @@ class ReservationController extends Controller
         ]);
 
         $room->update([
-            'status' => $reservation->status === 'checked_in' ? 'occupied' : 'reserved',
+            'status' => $reservation->status === 'checked_in' ? 'occupied' : 'occupied',
         ]);
+        $availableRooms = Room::where('status', 'available')
+            ->whereHas('apartment', fn($q) =>
+                $q->where('hotel_id', $hotel->id)
+            )
+            ->pluck('number')
+            ->toArray();
+
+        $shareText = "📊 RAPPORT RÉSERVATIONS – {$hotel->name}\n\n";
+        $shareText .= "📅 Date : " . now()->format('Y-m-d') . "\n\n";
+
+        $shareText .= "🛏 Chambres libres : " . count($availableRooms) . "\n";
+
+        $pageTotalAmount = $reservation->total_amount;
+        $pagePaidAmount = $reservation->payments->sum('amount');
+        $pageRemainingAmount = max(0, $pageTotalAmount - $pagePaidAmount);
+        if (count($availableRooms)) {
+            $shareText .= "➡️ " . implode(', ', $availableRooms) . "\n\n";
+        }
+
+        $shareText .= "🧾 Réservations : " . $reservation->count() . "\n";
+        $shareText .= "💰 Total : " . number_format($pageTotalAmount,2) . "\n";
+        $shareText .= "✅ Payé : " . number_format($pagePaidAmount,2) . "\n";
+        $shareText .= "❗ Reste : " . number_format($pageRemainingAmount,2) . "\n\n";
+
+        $shareText .= "Gestion via Ayanna ERP";
 
         return redirect()
             ->route('reservations.index')
             ->with('success', 'Réservation enregistrée avec succès.')
-            ->with('share_text', $this->billingService->shareSummary($reservation->fresh('room', 'client'), $hotel));
+            ->with('share_text', $this->billingService->shareSummary(
+                $reservation->fresh('room', 'client'),
+                $hotel
+            ));
     }
 
     public function show(Reservation $reservation)
