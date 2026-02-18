@@ -20,7 +20,7 @@ class ClientPolicy
      */
     public function view(User $user, Client $client): bool
     {
-        return $this->viewAny($user);
+        return $this->viewAny($user) && $client->hotel_id === $user->currentHotel()?->id;
     }
 
     /**
@@ -36,7 +36,7 @@ class ClientPolicy
      */
     public function update(User $user, Client $client): bool
     {
-        return $this->create($user);
+        return $this->create($user) && $client->hotel_id === $user->currentHotel()?->id;
     }
 
     /**

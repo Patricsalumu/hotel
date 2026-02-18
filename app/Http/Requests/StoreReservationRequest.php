@@ -22,8 +22,12 @@ class StoreReservationRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var \App\Models\User|null $user */
+        $user = auth()->user();
+        $hotelId = $user?->currentHotel()?->id;
+
         return [
-            'client_id' => ['required', 'exists:clients,id'],
+            'client_id' => ['required', Rule::exists('clients', 'id')->where(fn ($query) => $query->where('hotel_id', $hotelId))],
             'room_id' => ['required', 'exists:rooms,id'],
             // checkin may be in the past or future; logic in controller will decide
             'checkin_date' => ['required', 'date'],

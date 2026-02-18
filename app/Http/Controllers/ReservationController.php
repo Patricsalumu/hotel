@@ -30,7 +30,9 @@ class ReservationController extends Controller
 
         $reservations = $query->latest()->paginate(15)->withQueryString();
 
-        $clients = Client::orderBy('name')->get();
+        $clients = Client::where('hotel_id', $hotel->id)
+            ->orderBy('name')
+            ->get();
         $availableRooms = Room::where('status', 'available')
             ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
             ->orderBy('number')
@@ -50,7 +52,9 @@ class ReservationController extends Controller
         $todayReceived = $reservationsForTotals->sum(fn ($r) => $r->payments->sum('amount'));
 
         // expenses today
-        $todayExpenses = \App\Models\Expense::whereDate('created_at', today())->sum('amount');
+        $todayExpenses = \App\Models\Expense::where('hotel_id', $hotel->id)
+            ->whereDate('created_at', today())
+            ->sum('amount');
         $balance = $todayReceived - $todayExpenses;
 
         $latestOccupiedReservation = Reservation::query()
@@ -137,8 +141,12 @@ class ReservationController extends Controller
             $roomStatus = 'reserved';
         }
 
+        $client = Client::where('id', $request->integer('client_id'))
+            ->where('hotel_id', $hotel->id)
+            ->firstOrFail();
+
         $reservation = Reservation::create([
-            'client_id' => $request->integer('client_id'),
+            'client_id' => $client->id,
             'room_id' => $room->id,
             'manager_id' => $request->user()->id,
             'id_user' => $request->user()->id,
@@ -303,7 +311,10 @@ class ReservationController extends Controller
         if ($request->filled('from_date') && $request->filled('to_date')) {
             $query->whereBetween('checkin_date', [$request->date('from_date'), $request->date('to_date')]);
         } else {
-            $query->whereDate('checkin_date', today());
+            $query->where(function ($subQuery) {
+                $subQuery->whereDate('checkin_date', today())
+                    ->orWhere('status', 'reserved');
+            });
         }
 
         if ($request->filled('room_number')) {
