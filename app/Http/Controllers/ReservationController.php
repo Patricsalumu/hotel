@@ -79,6 +79,8 @@ class ReservationController extends Controller
         $sharePageMessage .= "Total Sorties du Jour : " . number_format($todayExpenses, 2) . "\n";
         $sharePageMessage .= "Solde : " . number_format($balance, 2) . "\n\n";
         $sharePageMessage .= "— Informatisée par Ayanna ERP";
+
+        $whatsAppPhone = preg_replace('/\D+/', '', (string) $hotel->phone);
         // prepare calendar-friendly reservations data to avoid Blade parsing issues
         $calendarReservations = $reservations->getCollection()->map(fn ($r) => [
             'id' => $r->id,
@@ -96,6 +98,7 @@ class ReservationController extends Controller
             'hotel',
             'sharePageText',
             'sharePageMessage',
+            'whatsAppPhone',
             'availableNumbers',
             'occupiedNumbers',
             'todayReceived',

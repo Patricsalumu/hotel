@@ -60,7 +60,7 @@
             margin: 0;
         }
 
-        .rv-actions > * {
+        .rv-actions > :not(.modal) {
             display: inline-block !important;
             margin-right: .4rem;
         }
@@ -208,8 +208,14 @@
             <span id="shareText">{{ $sharePageText }}</span>
             <textarea id="shareMessageRaw" class="d-none">{{ $sharePageMessage ?? $sharePageText }}</textarea>
             <div class="d-flex gap-2 gh-mobile-stack">
+                @php
+                    $summaryText = $sharePageMessage ?? $sharePageText;
+                    $summaryWhatsAppUrl = !empty($whatsAppPhone)
+                        ? 'https://wa.me/' . $whatsAppPhone . '?text=' . urlencode($summaryText)
+                        : 'https://wa.me/?text=' . urlencode($summaryText);
+                @endphp
                 <a class="btn btn-sm btn-outline-success" target="_blank"
-                   href="https://web.whatsapp.com/send?text={{ urlencode($sharePageMessage ?? $sharePageText) }}">
+                   href="{{ $summaryWhatsAppUrl }}">
                     WhatsApp
                 </a>
                 <button class="btn btn-sm btn-outline-primary" 
@@ -353,8 +359,17 @@
                         <span class="badge text-bg-{{ $reservation->payment_status === 'paid' ? 'success' : ($reservation->payment_status === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$reservation->payment_status] ?? $reservation->payment_status }}</span>
                     </td>
                     <td class="rv-actions">
+                        @if($remaining > 0)
+                            <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#paymentModal{{ $reservation->id }}">Payer</button>
+                        @else
+                            <button class="btn btn-sm btn-outline-dark" type="button" disabled>Payer</button>
+                        @endif
                         <a class="btn btn-sm btn-outline-primary" href="{{ route('reservations.show',$reservation) }}">Voir</a>
-                        <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success">Check-in</button></form>
+                        @if($reservation->status === 'reserved')
+                            <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success">Check-in</button></form>
+                        @else
+                            <button class="btn btn-sm btn-outline-success" type="button" disabled>Check-in</button>
+                        @endif
                         <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger">Check-out</button></form>
                         @php
                             $occupiedAt = $reservation->updated_at?->format('H:i') ?? now()->format('H:i');
@@ -381,12 +396,51 @@
                             $rowShare .= "Total sortie du jour: " . number_format($todayExpenses, 2) . "\n";
                             $rowShare .= "Solde: " . number_format($balance, 2) . "\n\n";
                             $rowShare .= "— Signature informatisée par Ayanna ERP";
+
+                            $rowWhatsAppUrl = !empty($whatsAppPhone)
+                                ? 'https://wa.me/' . $whatsAppPhone . '?text=' . urlencode($rowShare)
+                                : 'https://wa.me/?text=' . urlencode($rowShare);
                         @endphp
                         <!-- Visible fallback WhatsApp button (inline styles to avoid CSS override) -->
-                        <a class="btn btn-sm" target="_blank" href="https://web.whatsapp.com/send?text={{ urlencode($rowShare) }}" title="Partager sur WhatsApp"
+                        <a class="btn btn-sm" target="_blank" href="{{ $rowWhatsAppUrl }}" title="Partager sur WhatsApp"
                            style="background:#25D366;color:#ffffff;border-radius:6px;padding:.4rem .6rem;display:inline-block;margin-right:.4rem;min-width:120px;text-align:center;">
                             📱 Partager sur WhatsApp
                         </a>
+
+                        @if($remaining > 0)
+                            <div class="modal fade" id="paymentModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form method="POST" action="{{ route('payments.store') }}">
+                                            @csrf
+                                            <input type="hidden" name="reservation_id" value="{{ $reservation->id }}">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Paiement – Chambre {{ $reservation->room->number }}</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-2">
+                                                    <label class="form-label">Montant</label>
+                                                    <input type="number" step="0.01" min="0.01" class="form-control" name="amount" value="{{ number_format($remaining, 2, '.', '') }}" required>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Mode de paiement</label>
+                                                    <select class="form-select" name="payment_method" required>
+                                                        <option value="cash" selected>Cash</option>
+                                                        <option value="card">Carte bancaire</option>
+                                                        <option value="mobile">Mobile money</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+                                                <button class="btn gh-btn-primary btn-primary">Valider paiement</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     </td>
                 </tr>
             @empty
