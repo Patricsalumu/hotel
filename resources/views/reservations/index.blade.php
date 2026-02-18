@@ -206,17 +206,18 @@
     @if(!empty($sharePageText))
         <div class="alert alert-info d-flex justify-content-between align-items-center gap-2 gh-mobile-stack">
             <span id="shareText">{{ $sharePageText }}</span>
+            <textarea id="shareMessageRaw" class="d-none">{{ $sharePageMessage ?? $sharePageText }}</textarea>
             <div class="d-flex gap-2 gh-mobile-stack">
                 <a class="btn btn-sm btn-outline-success" target="_blank"
-                   href="https://web.whatsapp.com/send?text={{ urlencode($sharePageText) }}">
+                   href="https://web.whatsapp.com/send?text={{ urlencode($sharePageMessage ?? $sharePageText) }}">
                     WhatsApp
                 </a>
                 <button class="btn btn-sm btn-outline-primary" 
-                    onclick="navigator.share ? navigator.share({text: document.getElementById('shareText').innerText}) : alert('Partage non supporté')">
+                    onclick="navigator.share ? navigator.share({text: document.getElementById('shareMessageRaw').value}) : alert('Partage non supporté')">
                     Partager
                 </button>
                 <button class="btn btn-sm btn-outline-secondary" 
-                    onclick="navigator.clipboard.writeText(document.getElementById('shareText').innerText)">
+                    onclick="navigator.clipboard.writeText(document.getElementById('shareMessageRaw').value)">
                     Copier
                 </button>
             </div>
@@ -356,13 +357,30 @@
                         <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success">Check-in</button></form>
                         <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger">Check-out</button></form>
                         @php
-                            $rowShare = "Chambre {$reservation->room->number} occupée le " . ($reservation->checkin_date?->format('Y-m-d') ?? '')
-                                . " ; checkout prévu " . ($reservation->expected_checkout_date?->format('Y-m-d') ?? '') . ".\n";
-                            $rowShare .= "Chambres libres: " . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'aucune') . "\n";
-                            $rowShare .= "Chambres occupées: " . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'aucune') . "\n";
-                            $rowShare .= "Total reçu aujourd'hui: " . number_format($todayReceived,2) . "\n";
-                            $rowShare .= "Total dépenses aujourd'hui: " . number_format($todayExpenses,2) . "\n";
-                            $rowShare .= "Solde: " . number_format($balance,2);
+                            $occupiedAt = $reservation->updated_at?->format('H:i') ?? now()->format('H:i');
+
+                            $freeRoomsList = count($availableNumbers)
+                                ? collect($availableNumbers)
+                                    ->values()
+                                    ->map(fn ($number, $index) => ($index + 1) . ". Chambre " . $number)
+                                    ->implode("\n")
+                                : "Aucune chambre libre";
+
+                            $occupiedRoomsList = count($occupiedNumbers)
+                                ? collect($occupiedNumbers)
+                                    ->values()
+                                    ->map(fn ($number, $index) => ($index + 1) . ". Chambre " . $number)
+                                    ->implode("\n")
+                                : "Aucune chambre occupée";
+
+                            $rowShare = "📢 *Notification {$hotel->name}*\n\n";
+                            $rowShare .= "{$reservation->room->number} vient d'être occupée à {$occupiedAt}.\n\n";
+                            $rowShare .= "*Résumé des chambres libres*\n{$freeRoomsList}\n\n";
+                            $rowShare .= "*Résumé des chambres occupées*\n{$occupiedRoomsList}\n\n";
+                            $rowShare .= "Total recette du jour: " . number_format($todayReceived, 2) . "\n";
+                            $rowShare .= "Total sortie du jour: " . number_format($todayExpenses, 2) . "\n";
+                            $rowShare .= "Solde: " . number_format($balance, 2) . "\n\n";
+                            $rowShare .= "— Signature informatisée par Ayanna ERP";
                         @endphp
                         <!-- Visible fallback WhatsApp button (inline styles to avoid CSS override) -->
                         <a class="btn btn-sm" target="_blank" href="https://web.whatsapp.com/send?text={{ urlencode($rowShare) }}" title="Partager sur WhatsApp"

@@ -53,11 +53,32 @@ class ReservationController extends Controller
         $todayExpenses = \App\Models\Expense::whereDate('created_at', today())->sum('amount');
         $balance = $todayReceived - $todayExpenses;
 
-        $sharePageText = "Chambres occupées : " . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'aucune') . "\n" .
+        $latestOccupiedReservation = Reservation::query()
+            ->with('room.apartment')
+            ->where('status', 'checked_in')
+            ->whereHas('room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+            ->latest('updated_at')
+            ->first();
+
+        $latestOccupiedLine = $latestOccupiedReservation
+            ? "Dernière chambre occupée : " . $latestOccupiedReservation->room->number . " à " . $latestOccupiedReservation->updated_at?->format('H:i')
+            : "Dernière chambre occupée : Aucune";
+
+        $sharePageText = $latestOccupiedLine . "\n" .
+            "Chambres occupées : " . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'aucune') . "\n" .
             "Chambres libres : " . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'aucune') . "\n" .
-            "Total reçu aujourd'hui : " . number_format($todayReceived, 2) . "\n" .
-            "Total dépenses aujourd'hui : " . number_format($todayExpenses, 2) . "\n" .
+            "Total Entrées du Jour : " . number_format($todayReceived, 2) . "\n" .
+            "Total Sorties du Jour : " . number_format($todayExpenses, 2) . "\n" .
             "Solde : " . number_format($balance, 2);
+
+        $sharePageMessage = "📢 *Notification {$hotel->name}*\n\n";
+        $sharePageMessage .= $latestOccupiedLine . "\n\n";
+        $sharePageMessage .= "*Chambres occupées*\n" . (count($occupiedNumbers) ? implode(', ', $occupiedNumbers) : 'Aucune') . "\n\n";
+        $sharePageMessage .= "*Chambres libres*\n" . (count($availableNumbers) ? implode(', ', $availableNumbers) : 'Aucune') . "\n\n";
+        $sharePageMessage .= "Total Entrées du Jour : " . number_format($todayReceived, 2) . "\n";
+        $sharePageMessage .= "Total Sorties du Jour : " . number_format($todayExpenses, 2) . "\n";
+        $sharePageMessage .= "Solde : " . number_format($balance, 2) . "\n\n";
+        $sharePageMessage .= "— Informatisée par Ayanna ERP";
         // prepare calendar-friendly reservations data to avoid Blade parsing issues
         $calendarReservations = $reservations->getCollection()->map(fn ($r) => [
             'id' => $r->id,
@@ -74,6 +95,7 @@ class ReservationController extends Controller
             'availableRooms',
             'hotel',
             'sharePageText',
+            'sharePageMessage',
             'availableNumbers',
             'occupiedNumbers',
             'todayReceived',
