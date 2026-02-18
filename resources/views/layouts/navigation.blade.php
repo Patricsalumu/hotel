@@ -1,4 +1,4 @@
-<nav class="navbar navbar-expand-lg navbar-dark" style="background:#111827; box-shadow: 0 8px 24px rgba(17,24,39,.20);">
+<nav class="navbar navbar-expand-lg navbar-dark fixed-top" style="background:#111827; box-shadow: 0 8px 24px rgba(17,24,39,.20); z-index: 1030;">
     <div class="container gh-shell">
         <a class="navbar-brand fw-semibold" href="{{ route('dashboard') }}">{{ config('app.name', 'Gestion Hôtelière') }}</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">

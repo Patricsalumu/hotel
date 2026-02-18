@@ -24,6 +24,7 @@
                     radial-gradient(circle at 100% 0%, rgba(17, 24, 39, 0.08), transparent 34%),
                     var(--gh-bg);
                 color: var(--gh-ink);
+                padding-top: 72px;
             }
 
             .gh-shell {
@@ -153,6 +154,10 @@
             }
 
             @media (max-width: 575.98px) {
+                body {
+                    padding-top: 66px;
+                }
+
                 .gh-shell {
                     padding-left: .65rem;
                     padding-right: .65rem;

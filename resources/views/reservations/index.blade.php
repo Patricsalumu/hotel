@@ -48,27 +48,28 @@
             min-width: 150px;
         }
 
-        .rv-actions {
+        .rv-inline-tools {
             display: flex;
             gap: .35rem;
-            flex-wrap: wrap;
-            min-width: 210px;
+            flex-wrap: nowrap;
+            align-items: center;
+            white-space: nowrap;
+            min-width: 320px;
         }
-        /* Ensure action buttons are always visible and accessible */
-        .rv-actions form {
+        .rv-inline-tools form {
             display: inline-block;
             margin: 0;
         }
 
-        .rv-actions > :not(.modal) {
+        .rv-inline-tools > :not(.modal) {
             display: inline-block !important;
-            margin-right: .4rem;
+            margin-right: .2rem;
         }
 
-        .rv-actions .btn {
+        .rv-inline-tools .btn {
             padding: .35rem .5rem;
             font-size: .85rem;
-            min-width: 56px;
+            min-width: 34px;
         }
 
         /* Calendar styles */
@@ -176,6 +177,10 @@
 
             .rv-actions {
                 min-width: 180px;
+            }
+
+            .rv-inline-tools {
+                min-width: 280px;
             }
 
             .calendar-grid {
@@ -336,7 +341,7 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 rv-table">
-            <thead class="table-light"><tr><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Reste</th><th>Statut</th><th>Actions</th></tr></thead>
+            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Reste</th><th>Suivi</th></tr></thead>
             <tbody>
             @forelse($reservations as $reservation)
                 @php
@@ -345,6 +350,7 @@
                     $remaining = max(0, $reservation->total_amount - $paid);
                 @endphp
                 <tr>
+                    <td><a href="{{ route('reservations.show',$reservation) }}" class="fw-semibold">RES-{{ $reservation->id }}</a></td>
                     <td>{{ $reservation->room->number }}</td>
                     <td class="rv-client">{{ $reservation->client->name }}</td>
                     <td>{{ $reservation->checkin_date?->format('Y-m-d') }}</td>
@@ -354,60 +360,41 @@
                     <td><span class="fw-semibold">{{ number_format($reservation->total_amount,2) }}</span></td>
                     <td><span class="text-success fw-semibold">{{ number_format($paid,2) }}</span></td>
                     <td><span class="text-danger fw-semibold">{{ number_format($remaining,2) }}</span></td>
-                    <td class="rv-status">
+                    <td>
+                        <div class="rv-inline-tools">
                         <span class="badge text-bg-{{ $reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info') }}">{{ ['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status }}</span>
                         <span class="badge text-bg-{{ $reservation->payment_status === 'paid' ? 'success' : ($reservation->payment_status === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$reservation->payment_status] ?? $reservation->payment_status }}</span>
-                    </td>
-                    <td class="rv-actions">
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}">Télécharger A4</a>
-                        <a class="btn btn-sm btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}">Télécharger 80mm</a>
+
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
+
                         @if($remaining > 0)
-                            <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#paymentModal{{ $reservation->id }}">Payer</button>
+                            <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#paymentModal{{ $reservation->id }}" title="Payer" aria-label="Payer">💳</button>
                         @else
-                            <button class="btn btn-sm btn-outline-dark" type="button" disabled>Payer</button>
+                            <button class="btn btn-sm btn-outline-dark" type="button" title="Déjà payé" aria-label="Déjà payé" disabled>💳</button>
                         @endif
-                        <a class="btn btn-sm btn-outline-primary" href="{{ route('reservations.show',$reservation) }}">Voir</a>
+
                         @if($reservation->status === 'reserved')
-                            <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success">Check-in</button></form>
+                            <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success" title="Check-in" aria-label="Check-in">✅</button></form>
                         @else
-                            <button class="btn btn-sm btn-outline-success" type="button" disabled>Check-in</button>
+                            <button class="btn btn-sm btn-outline-success" type="button" title="Check-in" aria-label="Check-in" disabled>✅</button>
                         @endif
-                        <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger">Check-out</button></form>
-                        @php
-                            $occupiedAt = $reservation->updated_at?->format('H:i') ?? now()->format('H:i');
+                        <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger" title="Check-out" aria-label="Check-out">↩</button></form>
+                        </div>
 
-                            $freeRoomsList = count($availableNumbers)
-                                ? collect($availableNumbers)
-                                    ->values()
-                                    ->map(fn ($number, $index) => ($index + 1) . ". Chambre " . $number)
-                                    ->implode("\n")
-                                : "Aucune chambre libre";
-
-                            $occupiedRoomsList = count($occupiedNumbers)
-                                ? collect($occupiedNumbers)
-                                    ->values()
-                                    ->map(fn ($number, $index) => ($index + 1) . ". Chambre " . $number)
-                                    ->implode("\n")
-                                : "Aucune chambre occupée";
-
-                            $rowShare = "📢 *Notification {$hotel->name}*\n\n";
-                            $rowShare .= "{$reservation->room->number} vient d'être occupée à {$occupiedAt}.\n\n";
-                            $rowShare .= "*Résumé des chambres libres*\n{$freeRoomsList}\n\n";
-                            $rowShare .= "*Résumé des chambres occupées*\n{$occupiedRoomsList}\n\n";
-                            $rowShare .= "Total recette du jour: " . number_format($todayReceived, 2) . "\n";
-                            $rowShare .= "Total sortie du jour: " . number_format($todayExpenses, 2) . "\n";
-                            $rowShare .= "Solde: " . number_format($balance, 2) . "\n\n";
-                            $rowShare .= "— Signature informatisée par Ayanna ERP";
-
-                            $rowWhatsAppUrl = !empty($whatsAppPhone)
-                                ? 'https://wa.me/' . $whatsAppPhone . '?text=' . urlencode($rowShare)
-                                : 'https://wa.me/?text=' . urlencode($rowShare);
-                        @endphp
-                        <!-- Visible fallback WhatsApp button (inline styles to avoid CSS override) -->
-                        <a class="btn btn-sm" target="_blank" href="{{ $rowWhatsAppUrl }}" title="Partager sur WhatsApp"
-                           style="background:#25D366;color:#ffffff;border-radius:6px;padding:.4rem .6rem;display:inline-block;margin-right:.4rem;min-width:120px;text-align:center;">
-                            📱 Partager sur WhatsApp
-                        </a>
+                        <div class="modal fade" id="downloadInvoiceModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-sm">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Télécharger facture</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body d-grid gap-2">
+                                        <a class="btn btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}">Format A4</a>
+                                        <a class="btn btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}">Format 80mm</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         @if($remaining > 0)
                             <div class="modal fade" id="paymentModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
