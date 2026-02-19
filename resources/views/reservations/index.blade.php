@@ -223,10 +223,10 @@
                    href="{{ $summaryWhatsAppUrl }}">
                     WhatsApp
                 </a>
-                <button class="btn btn-sm btn-outline-primary" 
+                <!-- <button class="btn btn-sm btn-outline-primary" 
                     onclick="navigator.share ? navigator.share({text: document.getElementById('shareMessageRaw').value}) : alert('Partage non supporté')">
                     Partager
-                </button>
+                </button> -->
                 <button class="btn btn-sm btn-outline-secondary" 
                     onclick="navigator.clipboard.writeText(document.getElementById('shareMessageRaw').value)">
                     Copier

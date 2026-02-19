@@ -67,7 +67,7 @@ class ReservationController extends Controller
             ->first();
 
         $latestOccupiedLine = $latestOccupiedReservation
-            ? "Dernière chambre occupée : " . $latestOccupiedReservation->room->number . " à " . $latestOccupiedReservation->updated_at?->format('H:i')
+            ? "Chambre : " . $latestOccupiedReservation->room->number . " vient d'etre occupée à " . $latestOccupiedReservation->updated_at?->format('H:i')
             : "Dernière chambre occupée : Aucune";
 
         $sharePageText = $latestOccupiedLine . "\n" .
