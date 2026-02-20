@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreExpenseRequest extends FormRequest
+class UpdateExpenseAccountRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -25,12 +25,19 @@ class StoreExpenseRequest extends FormRequest
         /** @var \App\Models\User|null $user */
         $user = auth()->user();
         $hotelId = $user?->currentHotel()?->id;
+        $expenseAccount = $this->route('expense_account');
+        $expenseAccountId = is_object($expenseAccount) ? $expenseAccount->id : $expenseAccount;
 
         return [
-            'account_id' => ['required', Rule::exists('expense_accounts', 'id')->where(fn ($query) => $query->where('hotel_id', $hotelId))],
-            'category' => ['nullable', Rule::in(['carburant', 'transport', 'salaires', 'autres'])],
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'description' => ['nullable', 'string', 'max:2000'],
+            'name' => [
+                'required',
+                'string',
+                'max:120',
+                Rule::unique('expense_accounts', 'name')
+                    ->where(fn ($query) => $query->where('hotel_id', $hotelId))
+                    ->ignore($expenseAccountId),
+            ],
+            'description' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

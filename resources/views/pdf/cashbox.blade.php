@@ -70,7 +70,7 @@
         <thead>
             <tr>
                 <th>Heure</th>
-                <th>Catégorie</th>
+                <th>Compte</th>
                 <th class="right">Montant</th>
                 <th>Description</th>
             </tr>
@@ -79,7 +79,7 @@
         @forelse($expenses as $e)
             <tr>
                 <td>{{ $e->created_at }}</td>
-                <td>{{ ['carburant' => 'Carburant', 'transport' => 'Transport', 'salaires' => 'Salaires', 'autres' => 'Autres'][$e->category] ?? ucfirst($e->category) }}</td>
+                <td>{{ $e->account?->name ?? '-' }}</td>
                 <td class="right">{{ \App\Support\Money::format($e->amount, $currency) }}</td>
                 <td>{{ $e->description }}</td>
             </tr>

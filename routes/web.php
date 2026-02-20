@@ -5,6 +5,7 @@ use App\Http\Controllers\CashboxController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExpenseController;
+use App\Http\Controllers\ExpenseAccountController;
 use App\Http\Controllers\HotelController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProfileController;
@@ -54,8 +55,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
 
     Route::get('/cashbox', [CashboxController::class, 'index'])->name('cashbox.index');
+    Route::get('/cashbox/accounts', [ExpenseAccountController::class, 'index'])->name('cashbox.accounts');
     Route::get('/cashbox/pdf', [CashboxController::class, 'exportPdf'])->name('cashbox.pdf');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::post('/expense-accounts', [ExpenseAccountController::class, 'store'])->name('expense-accounts.store');
+    Route::patch('/expense-accounts/{expense_account}', [ExpenseAccountController::class, 'update'])->name('expense-accounts.update');
 
     Route::middleware('role:owner')->group(function () {
         Route::resource('owner/hotels', HotelController::class)->only(['index', 'store'])->names('owner.hotels');

@@ -42,4 +42,9 @@ class Hotel extends Model
     {
         return $this->hasMany(Expense::class);
     }
+
+    public function expenseAccounts(): HasMany
+    {
+        return $this->hasMany(ExpenseAccount::class);
+    }
 }

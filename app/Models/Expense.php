@@ -15,6 +15,7 @@ class Expense extends Model
     protected $fillable = [
         'hotel_id',
         'user_id',
+        'account_id',
         'category',
         'amount',
         'description',
@@ -34,5 +35,10 @@ class Expense extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(ExpenseAccount::class, 'account_id');
     }
 }

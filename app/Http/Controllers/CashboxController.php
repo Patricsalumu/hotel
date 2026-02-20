@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Models\ExpenseAccount;
 use App\Models\Payment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ class CashboxController extends Controller
         $hotel = $request->user()->currentHotel();
         $from = $request->date('from_date') ?? today();
         $to = $request->date('to_date') ?? today();
+        $expenseAccountId = $request->integer('expense_account_id') ?: null;
 
         $payments = Payment::with('reservation.room')
             ->whereHas('reservation.room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
@@ -21,15 +23,32 @@ class CashboxController extends Controller
             ->latest('created_at')
             ->get();
 
-        $expenses = Expense::where('hotel_id', $hotel->id)
+        $expensesQuery = Expense::with('account')
+            ->where('hotel_id', $hotel->id)
             ->whereBetween('created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->latest('created_at')
-            ->get();
+            ->latest('created_at');
+
+        if ($expenseAccountId) {
+            $expensesQuery->where('account_id', $expenseAccountId);
+        }
+
+        $expenses = $expensesQuery->get();
+        $expenseAccounts = ExpenseAccount::where('hotel_id', $hotel->id)->orderBy('name')->get();
 
         $totalIn = (float) $payments->sum('amount');
         $totalOut = (float) $expenses->sum('amount');
 
-        return view('cashbox.index', compact('payments', 'expenses', 'totalIn', 'totalOut', 'from', 'to', 'hotel'));
+        return view('cashbox.index', compact(
+            'payments',
+            'expenses',
+            'totalIn',
+            'totalOut',
+            'from',
+            'to',
+            'hotel',
+            'expenseAccounts',
+            'expenseAccountId'
+        ));
     }
 
     public function exportPdf(Request $request)
@@ -39,6 +58,7 @@ class CashboxController extends Controller
 
         $from = $request->date('from_date') ?? today();
         $to = $request->date('to_date') ?? today();
+        $expenseAccountId = $request->integer('expense_account_id') ?: null;
 
         $payments = Payment::with('reservation.room')
             ->whereHas('reservation.room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
@@ -46,10 +66,16 @@ class CashboxController extends Controller
             ->latest('created_at')
             ->get();
 
-        $expenses = Expense::where('hotel_id', $hotel->id)
+        $expensesQuery = Expense::with('account')
+            ->where('hotel_id', $hotel->id)
             ->whereBetween('created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
-            ->latest('created_at')
-            ->get();
+            ->latest('created_at');
+
+        if ($expenseAccountId) {
+            $expensesQuery->where('account_id', $expenseAccountId);
+        }
+
+        $expenses = $expensesQuery->get();
 
         $enterpriseEmail = $hotel->owner?->email;
         $enterpriseAddress = trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? ''));
