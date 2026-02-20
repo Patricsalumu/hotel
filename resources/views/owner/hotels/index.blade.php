@@ -2,6 +2,11 @@
     <x-slot name="header"><h4 class="mb-0">Administration - Hôtel</h4></x-slot>
 
     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
+    @if($errors->any())
+        <div class="alert alert-danger">
+            @foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach
+        </div>
+    @endif
 
     <div class="card mb-3">
         <div class="card-body d-flex flex-wrap gap-2 justify-content-between align-items-center">
@@ -28,7 +33,11 @@
                     </select>
                 </div>
                 <div class="col-md-2"><input class="form-control" type="file" name="image" accept="image/*"></div>
-                <div class="col-md-1"><input class="form-control" type="time" name="checkout_time" value="{{ $hotel->checkout_time ?? '12:00' }}" required></div>
+                <div class="col-md-1"><input class="form-control" type="time" name="checkout_time" value="{{ old('checkout_time', !empty($hotel?->checkout_time) ? substr((string) $hotel->checkout_time, 0, 5) : '12:00') }}" required></div>
+                <div class="col-md-12">
+                    <label class="form-label">Note de facture</label>
+                    <textarea class="form-control" name="note" rows="2" placeholder="Ex: Le checkout se passe chaque jour à 10h.">{{ old('note', $hotel->note ?? '') }}</textarea>
+                </div>
                 <div class="col-md-1"><button class="btn btn-primary w-100">Enregistrer</button></div>
                 @if(!empty($hotel?->image))
                     <div class="col-12">

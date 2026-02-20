@@ -144,7 +144,7 @@
                     <tr>
                         <th>Logement</th>
                         <th>Nuitées</th>
-                        <th class="right">Total</th>
+                        <th class="right">Net</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -152,6 +152,14 @@
                         <td>{{ ($reservation->room->apartment->name ?? '-') . ' / Ch. ' . $reservation->room->number }}</td>
                         <td>Prévues: {{ $expectedNights }}<br>Réelles: {{ $actualNights }}</td>
                         <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Total à payer</strong></td>
+                        <td class="right">{{ \App\Support\Money::format($grossAmount, $currency) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><strong>Réduction</strong></td>
+                        <td class="right">{{ \App\Support\Money::format($discountAmount, $currency) }}</td>
                     </tr>
                     <tr>
                         <td colspan="2"><strong>Montant / nuit</strong></td>
@@ -168,7 +176,7 @@
                         <th>Nuitée prévue</th>
                         <th>Nuitée réelle</th>
                         <th>Montant / nuit</th>
-                        <th>Total</th>
+                        <th>Net</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -179,6 +187,14 @@
                         <td>{{ $actualNights }}</td>
                         <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
                         <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5"><strong>Total à payer</strong></td>
+                        <td class="right">{{ \App\Support\Money::format($grossAmount, $currency) }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="5"><strong>Réduction</strong></td>
+                        <td class="right">{{ \App\Support\Money::format($discountAmount, $currency) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -198,6 +214,10 @@
     <div class="block">
         <table>
             <tbody>
+                <tr>
+                    <td><strong>Net à payer</strong></td>
+                    <td class="right"><strong>{{ \App\Support\Money::format($totalAmount, $currency) }}</strong></td>
+                </tr>
                 <tr>
                     <td><strong>Déjà payé</strong></td>
                     <td class="right"><strong>{{ \App\Support\Money::format($paidAmount, $currency) }}</strong></td>
@@ -259,6 +279,11 @@
                 </tbody>
             </table>
         @endif
+    </div>
+
+    <div class="block">
+        <div class="label">Note</div>
+        <div>{{ $hotel->note ?: '-' }}</div>
     </div>
 
     <div class="small">

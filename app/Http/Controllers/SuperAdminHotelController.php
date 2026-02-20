@@ -29,7 +29,8 @@ class SuperAdminHotelController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'currency' => ['required', Rule::in(['FC', 'USD'])],
             'image' => ['nullable', 'image', 'max:2048'],
-            'checkout_time' => ['required', 'date_format:H:i'],
+            'checkout_time' => ['required', 'date_format:H:i,H:i:s'],
+            'note' => ['nullable', 'string', 'max:1000'],
             'owner_id' => ['required', Rule::exists('users', 'id')->where(fn ($query) => $query->where('role', 'owner'))],
         ]);
 
@@ -47,6 +48,7 @@ class SuperAdminHotelController extends Controller
                 'currency' => $data['currency'],
                 'image' => $data['image'] ?? null,
                 'checkout_time' => $data['checkout_time'],
+                'note' => $data['note'] ?? null,
             ]);
 
             User::where('id', $data['owner_id'])->update(['hotel_id' => $hotel->id]);

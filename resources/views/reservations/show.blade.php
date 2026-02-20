@@ -8,6 +8,7 @@
             <div class="d-flex gap-2">
                 <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}" class="btn btn-sm btn-outline-light">Télécharger A4</a>
                 <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}" class="btn btn-sm btn-outline-light">Télécharger 80mm</a>
+                <a href="{{ $whatsAppInvoiceUrl ?? '#' }}" target="_blank" class="btn btn-sm btn-outline-light">WhatsApp client</a>
                 <a href="{{ route('reservations.index') }}" class="btn btn-sm btn-light">Retour aux réservations</a>
             </div>
         </div>
@@ -16,8 +17,12 @@
     <div class="row g-3">
         @php
             $currency = $reservation->room->apartment->hotel->currency ?? 'FC';
+            $nights = $reservation->computeNights(now(), $reservation->room->apartment->hotel->checkout_time);
+            $grossAmount = (float) $reservation->room->price_per_night * $nights;
+            $discountAmount = (float) ($reservation->discount_amount ?? 0);
             $paidAmount = $reservation->payments->sum('amount');
-            $remainingAmount = max(0, (float) $reservation->total_amount - (float) $paidAmount);
+            $netAmount = (float) $reservation->total_amount;
+            $remainingAmount = max(0, $netAmount - (float) $paidAmount);
         @endphp
         <div class="col-md-8">
             <div class="gh-card card"><div class="card-body">
@@ -27,7 +32,9 @@
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Date d’arrivée</div><div class="fw-semibold">{{ $reservation->checkin_date?->format('Y-m-d') }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ prévu</div><div class="fw-semibold">{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ réel</div><div class="fw-semibold">{{ $reservation->actual_checkout_date?->format('Y-m-d') ?? '-' }}</div></div></div>
-                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total</div><div class="gh-kpi-value">{{ \App\Support\Money::format($reservation->total_amount, $currency) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total à payer</div><div class="gh-kpi-value">{{ \App\Support\Money::format($grossAmount, $currency) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Réduction</div><div class="gh-kpi-value text-warning">{{ \App\Support\Money::format($discountAmount, $currency) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Net à payer</div><div class="gh-kpi-value">{{ \App\Support\Money::format($netAmount, $currency) }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Montant déjà payé</div><div class="gh-kpi-value text-success">{{ \App\Support\Money::format($paidAmount, $currency) }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Reste à payer</div><div class="gh-kpi-value text-danger">{{ \App\Support\Money::format($remainingAmount, $currency) }}</div></div></div>
                     <div class="col-md-12"><div class="gh-kpi h-100"><div class="gh-kpi-label">Réservation créée par</div><div class="fw-semibold">{{ $reservation->user?->name ?? $reservation->manager?->name ?? '-' }}</div></div></div>

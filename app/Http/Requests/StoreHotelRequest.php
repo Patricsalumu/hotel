@@ -29,7 +29,8 @@ class StoreHotelRequest extends FormRequest
             'phone' => ['nullable', 'string', 'max:50'],
             'currency' => ['required', Rule::in(['FC', 'USD'])],
             'image' => ['nullable', 'image', 'max:2048'],
-            'checkout_time' => ['required', 'date_format:H:i'],
+            'checkout_time' => ['required', 'date_format:H:i,H:i:s'],
+            'note' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

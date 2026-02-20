@@ -11,6 +11,7 @@ use App\Support\Money;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
 
 class ReservationController extends Controller
 {
@@ -157,6 +158,7 @@ class ReservationController extends Controller
             'status' => $initialStatus,
             'payment_status' => 'unpaid',
             'total_amount' => 0,
+            'discount_amount' => (float) $request->input('discount_amount', 0),
         ]);
 
         $reservation->refresh();
@@ -193,15 +195,49 @@ class ReservationController extends Controller
 
         $shareText .= "Gestion via Ayanna ERP";
 
+        $creationSource = (string) $request->input('creation_source', 'reservations_index');
+        $successMessage = $creationSource === 'dashboard_shortcut'
+            ? 'Réservation enregistrée avec succès (depuis le raccourci du tableau de bord).'
+            : 'Réservation enregistrée avec succès.';
+
         return redirect()
             ->route('reservations.index')
-            ->with('success', 'Réservation enregistrée avec succès.');
+            ->with('success', $successMessage);
     }
 
     public function show(Reservation $reservation)
     {
         $reservation->load(['client', 'room.apartment.hotel', 'payments.user', 'manager', 'user']);
-        return view('reservations.show', compact('reservation'));
+
+        $hotel = $reservation->room->apartment->hotel;
+        $currency = $hotel->currency ?? 'FC';
+        $nights = $reservation->computeNights(now(), $hotel->checkout_time);
+        $grossAmount = (float) $reservation->room->price_per_night * $nights;
+        $discountAmount = (float) ($reservation->discount_amount ?? 0);
+        $netAmount = (float) $reservation->total_amount;
+        $paidAmount = (float) $reservation->payments->sum('amount');
+        $remainingAmount = max(0, $netAmount - $paidAmount);
+        $clientPhone = preg_replace('/\D+/', '', (string) $reservation->client->phone);
+        $publicInvoiceA4 = URL::temporarySignedRoute(
+            'reservations.public.invoice.pdf',
+            now()->addDays(7),
+            ['reservation' => $reservation->id, 'paper' => 'a4']
+        );
+
+        $waText = "Bonjour {$reservation->client->name},\n";
+        $waText .= "Reservation #{$reservation->id} - Chambre {$reservation->room->number}\n";
+        $waText .= "Total: " . Money::format($grossAmount, $currency) . "\n";
+        $waText .= "Reduction: " . Money::format($discountAmount, $currency) . "\n";
+        $waText .= "Net a payer: " . Money::format($netAmount, $currency) . "\n";
+        $waText .= "Paye: " . Money::format($paidAmount, $currency) . "\n";
+        $waText .= "Reste: " . Money::format($remainingAmount, $currency) . "\n";
+        $waText .= "Facture A4: {$publicInvoiceA4}";
+
+        $whatsAppInvoiceUrl = $clientPhone
+            ? 'https://wa.me/' . $clientPhone . '?text=' . urlencode($waText)
+            : 'https://wa.me/?text=' . urlencode($waText);
+
+        return view('reservations.show', compact('reservation', 'whatsAppInvoiceUrl'));
     }
 
     public function update(Request $request, Reservation $reservation)
@@ -270,6 +306,26 @@ class ReservationController extends Controller
     {
         $this->authorize('view', $reservation);
 
+        $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
+        [, $pdf] = $this->buildInvoicePdf($reservation, $paper);
+
+        return $pdf->download('facture-reservation-' . $reservation->id . '-' . $paper . '.pdf');
+    }
+
+    public function publicInvoicePdf(Request $request, Reservation $reservation)
+    {
+        if (! $request->hasValidSignature()) {
+            abort(403);
+        }
+
+        $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
+        [, $pdf] = $this->buildInvoicePdf($reservation, $paper);
+
+        return $pdf->download('facture-reservation-' . $reservation->id . '-' . $paper . '.pdf');
+    }
+
+    private function buildInvoicePdf(Reservation $reservation, string $paper): array
+    {
         $reservation->load([
             'client',
             'room.apartment.hotel',
@@ -280,10 +336,11 @@ class ReservationController extends Controller
 
         $hotel = $reservation->room->apartment->hotel;
         $currency = $hotel->currency ?? 'FC';
-        $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
 
         $paidAmount = (float) $reservation->payments->sum('amount');
-        $totalAmount = (float) $reservation->total_amount;
+        $grossAmount = $this->billingService->computeGrossTotal($reservation, $hotel);
+        $discountAmount = (float) ($reservation->discount_amount ?? 0);
+        $totalAmount = max(0, $grossAmount - $discountAmount);
         $remainingAmount = max(0, $totalAmount - $paidAmount);
 
         $expectedNights = $reservation->expected_checkout_date
@@ -291,7 +348,7 @@ class ReservationController extends Controller
             : 1;
 
         $actualNights = $reservation->computeNights(now(), $hotel->checkout_time);
-        $pricePerNight = $actualNights > 0 ? round($totalAmount / $actualNights, 2) : $totalAmount;
+        $pricePerNight = $actualNights > 0 ? round($grossAmount / $actualNights, 2) : $grossAmount;
 
         $paymentStatusLabel = [
             'paid' => 'PAYÉ',
@@ -308,11 +365,19 @@ class ReservationController extends Controller
             }
         }
 
+        $publicA4Url = URL::temporarySignedRoute(
+            'reservations.public.invoice.pdf',
+            now()->addDays(7),
+            ['reservation' => $reservation->id, 'paper' => 'a4']
+        );
+
         $pdf = Pdf::loadView('pdf.invoice', compact(
             'reservation',
             'hotel',
             'paper',
             'paidAmount',
+            'grossAmount',
+            'discountAmount',
             'totalAmount',
             'remainingAmount',
             'expectedNights',
@@ -320,7 +385,8 @@ class ReservationController extends Controller
             'pricePerNight',
             'paymentStatusLabel',
             'currency',
-            'logoDataUri'
+            'logoDataUri',
+            'publicA4Url'
         ));
 
         if ($paper === '80mm') {
@@ -329,7 +395,7 @@ class ReservationController extends Controller
             $pdf->setPaper('a4', 'portrait');
         }
 
-        return $pdf->download('facture-reservation-' . $reservation->id . '-' . $paper . '.pdf');
+        return [$reservation, $pdf];
     }
 
     private function applyFilters($query, Request $request): void

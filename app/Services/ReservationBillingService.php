@@ -16,10 +16,23 @@ class ReservationBillingService
 
     public function computeTotal(Reservation $reservation, Hotel $hotel, ?Carbon $now = null): float
     {
+        return $this->computeNetTotal($reservation, $hotel, $now);
+    }
+
+    public function computeGrossTotal(Reservation $reservation, Hotel $hotel, ?Carbon $now = null): float
+    {
         $reservation->loadMissing('room');
         $nights = $this->calculateNights($reservation, $hotel, $now);
 
         return (float) $reservation->room->price_per_night * $nights;
+    }
+
+    public function computeNetTotal(Reservation $reservation, Hotel $hotel, ?Carbon $now = null): float
+    {
+        $gross = $this->computeGrossTotal($reservation, $hotel, $now);
+        $discount = (float) ($reservation->discount_amount ?? 0);
+
+        return max(0, $gross - $discount);
     }
 
     public function refreshPaymentStatus(Reservation $reservation): void

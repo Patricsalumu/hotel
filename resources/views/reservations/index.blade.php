@@ -313,28 +313,86 @@
             <div class="modal-content">
                 <form method="POST" action="{{ route('reservations.store') }}">
                     @csrf
+                    <input type="hidden" name="creation_source" value="reservations_index">
                     <div class="modal-header"><h5 class="modal-title">Nouvelle réservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
                         <div class="mb-2">
+                            <label class="form-label">Rechercher client</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="clientSearchInput" placeholder="Nom, téléphone, email">
+                                <button class="btn btn-outline-secondary" type="button" id="clientSearchBtn">Rechercher</button>
+                            </div>
+                            <div class="small text-muted mt-1" id="clientSearchFeedback"></div>
+                        </div>
+                        <div class="mb-2">
                             <label class="form-label">Client</label>
-                            <select class="form-select" name="client_id" required>
+                            <select class="form-select" name="client_id" id="reservationClientSelect" required>
                                 <option value="">Client</option>
                                 @foreach($clients as $client)<option value="{{ $client->id }}">{{ $client->name }}</option>@endforeach
                             </select>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="openCreateClientModalBtn" data-bs-toggle="modal" data-bs-target="#createClientQuickModal">Nouveau client</button>
                         </div>
                         <div class="mb-2">
                             <label class="form-label">Chambre disponible</label>
-                            <select class="form-select" name="room_id" required>
+                            <select class="form-select" name="room_id" id="reservationRoomSelect" required>
                                 <option value="">Chambre disponible</option>
-                                @foreach($availableRooms as $room)<option value="{{ $room->id }}">{{ $room->number }}</option>@endforeach
+                                @foreach($availableRooms as $room)
+                                    <option value="{{ $room->id }}" data-price="{{ (float) $room->price_per_night }}">{{ $room->number }}</option>
+                                @endforeach
                             </select>
                         </div>
                         <div class="row g-2">
-                            <div class="col-md-6"><label class="form-label">Date d’arrivée</label><input type="date" class="form-control" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
-                            <div class="col-md-6"><label class="form-label">Date prévue</label><input type="date" class="form-control" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
+                            <div class="col-md-6"><label class="form-label">Date d’arrivée</label><input type="date" class="form-control" id="reservationCheckinDate" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
+                            <div class="col-md-6"><label class="form-label">Date prévue</label><input type="date" class="form-control" id="reservationCheckoutDate" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="form-label">Réduction</label>
+                            <input type="number" step="0.01" min="0" class="form-control" id="reservationDiscountAmount" name="discount_amount" value="{{ old('discount_amount', 0) }}" placeholder="0">
+                        </div>
+                        <div class="mt-3 border rounded p-2 bg-light">
+                            <div class="d-flex justify-content-between"><span>Total à payer</span><strong id="reservationGrossAmount">0 {{ $currency }}</strong></div>
+                            <div class="d-flex justify-content-between"><span>Réduction</span><strong id="reservationDiscountPreview">0 {{ $currency }}</strong></div>
+                            <div class="d-flex justify-content-between"><span>Net à payer</span><strong id="reservationNetAmount">0 {{ $currency }}</strong></div>
                         </div>
                     </div>
                     <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button><button class="btn gh-btn-primary btn-primary">Créer</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="createClientQuickModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="createClientQuickForm">
+                    @csrf
+                    <div class="modal-header"><h5 class="modal-title">Nouveau client</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label">Nom</label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Téléphone</label>
+                                <input type="text" class="form-control" name="phone">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="email">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Nationalité</label>
+                                <input type="text" class="form-control" name="nationality">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">N° document</label>
+                                <input type="text" class="form-control" name="document_number">
+                            </div>
+                        </div>
+                        <div class="small mt-2" id="clientCreateFeedback"></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button><button class="btn gh-btn-primary btn-primary" type="submit">Créer et sélectionner</button></div>
                 </form>
             </div>
         </div>
@@ -347,8 +405,23 @@
             @forelse($reservations as $reservation)
                 @php
                     $nights = $reservation->computeNights(now(), $hotel->checkout_time);
+                    $gross = (float) $reservation->room->price_per_night * $nights;
+                    $discount = (float) ($reservation->discount_amount ?? 0);
                     $paid = $reservation->payments->sum('amount');
                     $remaining = max(0, $reservation->total_amount - $paid);
+                    $clientPhone = preg_replace('/\D+/', '', (string) $reservation->client->phone);
+                    $publicInvoiceA4 = \Illuminate\Support\Facades\URL::temporarySignedRoute('reservations.public.invoice.pdf', now()->addDays(7), ['reservation' => $reservation->id, 'paper' => 'a4']);
+                    $waText = "Bonjour {$reservation->client->name},\n";
+                    $waText .= "Reservation #{$reservation->id} - Chambre {$reservation->room->number}\n";
+                    $waText .= "Total: " . \App\Support\Money::format($gross, $currency) . "\n";
+                    $waText .= "Reduction: " . \App\Support\Money::format($discount, $currency) . "\n";
+                    $waText .= "Net a payer: " . \App\Support\Money::format($reservation->total_amount, $currency) . "\n";
+                    $waText .= "Paye: " . \App\Support\Money::format($paid, $currency) . "\n";
+                    $waText .= "Reste: " . \App\Support\Money::format($remaining, $currency) . "\n";
+                    $waText .= "Facture A4: {$publicInvoiceA4}";
+                    $waUrl = $clientPhone
+                        ? 'https://wa.me/' . $clientPhone . '?text=' . urlencode($waText)
+                        : 'https://wa.me/?text=' . urlencode($waText);
                 @endphp
                 <tr>
                     <td><a href="{{ route('reservations.show',$reservation) }}" class="fw-semibold">RES-{{ $reservation->id }}</a></td>
@@ -392,6 +465,7 @@
                                     <div class="modal-body d-grid gap-2">
                                         <a class="btn btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}">Format A4</a>
                                         <a class="btn btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}">Format 80mm</a>
+                                        <a class="btn btn-outline-success" target="_blank" href="{{ $waUrl }}">Partager WhatsApp client</a>
                                     </div>
                                 </div>
                             </div>
@@ -543,6 +617,226 @@
         document.getElementById('nextMonth').addEventListener('click', () => {
             currentMonth.setMonth(currentMonth.getMonth() + 1);
             renderCalendar();
+        });
+
+        const formatMoney = (value) => {
+            const numeric = Number(value || 0);
+            return `${numeric.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {{ $currency }}`;
+        };
+
+        const roomSelect = document.getElementById('reservationRoomSelect');
+        const checkinInput = document.getElementById('reservationCheckinDate');
+        const checkoutInput = document.getElementById('reservationCheckoutDate');
+        const discountInput = document.getElementById('reservationDiscountAmount');
+        const grossPreview = document.getElementById('reservationGrossAmount');
+        const discountPreview = document.getElementById('reservationDiscountPreview');
+        const netPreview = document.getElementById('reservationNetAmount');
+
+        const computeReservationAmounts = () => {
+            const selectedRoom = roomSelect?.selectedOptions?.[0];
+            const nightly = Number(selectedRoom?.dataset?.price || 0);
+
+            const checkinDate = checkinInput?.value ? new Date(checkinInput.value) : null;
+            const checkoutDate = checkoutInput?.value ? new Date(checkoutInput.value) : null;
+
+            let nights = 1;
+            if (checkinDate && checkoutDate && checkoutDate >= checkinDate) {
+                nights = Math.max(1, Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)));
+            }
+
+            const gross = nightly * nights;
+            const discount = Math.max(0, Number(discountInput?.value || 0));
+            const net = Math.max(0, gross - discount);
+
+            if (grossPreview) grossPreview.textContent = formatMoney(gross);
+            if (discountPreview) discountPreview.textContent = formatMoney(discount);
+            if (netPreview) netPreview.textContent = formatMoney(net);
+        };
+
+        [roomSelect, checkinInput, checkoutInput, discountInput].forEach((el) => {
+            el?.addEventListener('change', computeReservationAmounts);
+            el?.addEventListener('input', computeReservationAmounts);
+        });
+        computeReservationAmounts();
+
+        const clientSearchInput = document.getElementById('clientSearchInput');
+        const clientSearchBtn = document.getElementById('clientSearchBtn');
+        const clientSearchFeedback = document.getElementById('clientSearchFeedback');
+        const clientSelect = document.getElementById('reservationClientSelect');
+        const createClientModalEl = document.getElementById('createClientQuickModal');
+        const createClientNameInput = createClientModalEl?.querySelector('input[name="name"]');
+
+        const setFeedback = (element, message, type = 'info') => {
+            if (!element) return;
+            element.classList.remove('text-danger', 'text-success', 'text-muted', 'text-warning');
+            if (type === 'error') element.classList.add('text-danger');
+            else if (type === 'success') element.classList.add('text-success');
+            else if (type === 'warning') element.classList.add('text-warning');
+            else element.classList.add('text-muted');
+            element.textContent = message;
+        };
+
+        const upsertClientOption = (client) => {
+            if (!clientSelect || !client?.id) {
+                return;
+            }
+
+            let option = [...clientSelect.options].find((opt) => Number(opt.value) === Number(client.id));
+            if (!option) {
+                option = document.createElement('option');
+                option.value = client.id;
+                clientSelect.appendChild(option);
+            }
+
+            option.textContent = client.name;
+            clientSelect.value = String(client.id);
+        };
+
+        const initialClients = [...(clientSelect?.options || [])]
+            .filter((opt) => opt.value)
+            .map((opt) => ({ id: Number(opt.value), name: opt.textContent || '' }));
+
+        const renderClientOptions = (clients, autoSelect = true) => {
+            if (!clientSelect) return;
+
+            clientSelect.innerHTML = '<option value="">Client</option>';
+            clients.forEach((client) => {
+                const option = document.createElement('option');
+                option.value = String(client.id);
+                option.textContent = client.name;
+                clientSelect.appendChild(option);
+            });
+
+            if (autoSelect && clients.length > 0) {
+                clientSelect.value = String(clients[0].id);
+            }
+        };
+
+        const filterLocalClients = (q) => {
+            const term = q.trim().toLowerCase();
+            if (!term) {
+                return initialClients;
+            }
+
+            return initialClients.filter((client) => client.name.toLowerCase().includes(term));
+        };
+
+        let remoteSearchDebounce;
+
+        const remoteSearchClients = async (q, canOpenCreateModal = false) => {
+            const query = q.trim();
+            if (!query) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`{{ route('clients.search') }}?q=${encodeURIComponent(query)}`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const data = await response.json();
+                const clients = data?.clients || [];
+
+                if (clients.length > 0) {
+                    renderClientOptions(clients);
+                    setFeedback(clientSearchFeedback, `${clients.length} client(s) trouvé(s).`, 'success');
+                    return;
+                }
+
+                if (canOpenCreateModal) {
+                    setFeedback(clientSearchFeedback, 'Aucun client trouvé. Créez un nouveau client.', 'warning');
+                    if (createClientNameInput) {
+                        createClientNameInput.value = query;
+                    }
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('createClientQuickModal')).show();
+                } else {
+                    setFeedback(clientSearchFeedback, 'Aucun client trouvé pour cette recherche.', 'warning');
+                }
+            } catch (error) {
+                setFeedback(clientSearchFeedback, 'Erreur de recherche client.', 'error');
+            }
+        };
+
+        clientSearchInput?.addEventListener('input', () => {
+            const q = clientSearchInput.value || '';
+            const localMatches = filterLocalClients(q);
+            renderClientOptions(localMatches, true);
+
+            if (!q.trim()) {
+                setFeedback(clientSearchFeedback, '', 'info');
+                clearTimeout(remoteSearchDebounce);
+                return;
+            }
+
+            if (localMatches.length > 0) {
+                setFeedback(clientSearchFeedback, `${localMatches.length} client(s) localement.`, 'info');
+            } else {
+                setFeedback(clientSearchFeedback, 'Recherche serveur en cours...', 'info');
+            }
+
+            clearTimeout(remoteSearchDebounce);
+            remoteSearchDebounce = setTimeout(() => remoteSearchClients(q, false), 250);
+        });
+
+        clientSearchBtn?.addEventListener('click', async () => {
+            const q = (clientSearchInput?.value || '').trim();
+            if (!q) {
+                setFeedback(clientSearchFeedback, 'Saisissez un nom, téléphone ou email.', 'warning');
+                return;
+            }
+
+            setFeedback(clientSearchFeedback, 'Recherche en cours...', 'info');
+            clientSearchBtn.disabled = true;
+
+            await remoteSearchClients(q, true);
+            clientSearchBtn.disabled = false;
+        });
+
+        const clientCreateForm = document.getElementById('createClientQuickForm');
+        const clientCreateFeedback = document.getElementById('clientCreateFeedback');
+
+        clientCreateForm?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            setFeedback(clientCreateFeedback, 'Création en cours...', 'info');
+            const submitButton = clientCreateForm.querySelector('button[type="submit"]');
+            if (submitButton) submitButton.disabled = true;
+
+            const formData = new FormData(clientCreateForm);
+            try {
+                const response = await fetch(`{{ route('clients.quick-store') }}`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    const firstError = data?.errors ? Object.values(data.errors)[0][0] : 'Erreur de création client.';
+                    setFeedback(clientCreateFeedback, firstError, 'error');
+                    return;
+                }
+
+                upsertClientOption(data.client);
+                initialClients.push({ id: Number(data.client.id), name: data.client.name });
+                setFeedback(clientCreateFeedback, 'Client créé et sélectionné.', 'success');
+                clientCreateForm.reset();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('createClientQuickModal')).hide();
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('createReservationModal')).show();
+            } catch (error) {
+                setFeedback(clientCreateFeedback, 'Erreur serveur. Réessayez.', 'error');
+            } finally {
+                if (submitButton) submitButton.disabled = false;
+            }
+        });
+
+        createClientModalEl?.addEventListener('hidden.bs.modal', () => {
+            setFeedback(clientCreateFeedback, '', 'info');
         });
     </script>
 

@@ -34,6 +34,9 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', DashboardController::class)->middleware(['auth'])->name('dashboard');
+Route::get('/public/reservations/{reservation}/invoice', [ReservationController::class, 'publicInvoicePdf'])
+    ->middleware('signed')
+    ->name('reservations.public.invoice.pdf');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -45,6 +48,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/reservations/{reservation}/invoice', [ReservationController::class, 'invoicePdf'])->name('reservations.invoice.pdf');
 
     Route::resource('clients', ClientController::class)->only(['index', 'store', 'show']);
+    Route::get('/clients/search', [ClientController::class, 'search'])->name('clients.search');
+    Route::post('/clients/quick-store', [ClientController::class, 'quickStore'])->name('clients.quick-store');
 
     Route::post('/payments', [PaymentController::class, 'store'])->name('payments.store');
 

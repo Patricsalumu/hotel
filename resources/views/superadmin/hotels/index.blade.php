@@ -76,6 +76,7 @@
                 <div class="col-md-2"><label class="form-label">Logo</label><input type="file" class="form-control" name="image" accept="image/*"></div>
                 <div class="col-md-1"><label class="form-label">Checkout</label><input type="time" class="form-control" name="checkout_time" value="{{ old('checkout_time', '12:00') }}" required></div>
                 <div class="col-md-4"><label class="form-label">Propriétaire</label><select class="form-select" name="owner_id" required><option value="">Sélectionner</option>@foreach($owners as $owner)<option value="{{ $owner->id }}" @selected((string) old('owner_id') === (string) $owner->id)>{{ $owner->name }} ({{ $owner->email }})</option>@endforeach</select></div>
+                <div class="col-md-12"><label class="form-label">Note facture</label><textarea class="form-control" name="note" rows="2" placeholder="Ex: Le checkout se passe chaque jour à 10h.">{{ old('note') }}</textarea></div>
                 <div class="col-12 d-flex justify-content-end"><button class="btn gh-btn-primary btn-primary">Créer hôtel</button></div>
             </form>
         </div>

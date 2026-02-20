@@ -19,6 +19,7 @@ class HotelController extends Controller
         $user = $request->user();
         $hotel = $user->ownedHotel;
         $data = $request->validated();
+        $data['note'] = $request->input('note');
 
         if ($request->hasFile('image')) {
             if ($hotel?->image) {
@@ -28,10 +29,13 @@ class HotelController extends Controller
             $data['image'] = $request->file('image')->store('hotels/logos', 'public');
         }
 
-        $hotel = Hotel::updateOrCreate(
-            ['owner_id' => $user->id],
-            $data
-        );
+        if ($hotel) {
+            $hotel->update($data);
+        } else {
+            $hotel = Hotel::create(array_merge($data, [
+                'owner_id' => $user->id,
+            ]));
+        }
 
         $user->update(['hotel_id' => $hotel->id]);
 

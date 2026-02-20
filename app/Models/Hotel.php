@@ -20,6 +20,7 @@ class Hotel extends Model
         'currency',
         'image',
         'checkout_time',
+        'note',
     ];
 
     public function owner(): BelongsTo

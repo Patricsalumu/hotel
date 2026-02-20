@@ -32,6 +32,7 @@ class Reservation extends Model
         'status',
         'payment_status',
         'total_amount',
+        'discount_amount',
     ];
 
     protected $casts = [
@@ -39,6 +40,7 @@ class Reservation extends Model
         'expected_checkout_date' => 'date',
         'actual_checkout_date' => 'date',
         'total_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
     ];
 
     public function client(): BelongsTo

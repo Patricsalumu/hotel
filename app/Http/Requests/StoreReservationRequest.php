@@ -33,6 +33,8 @@ class StoreReservationRequest extends FormRequest
             'checkin_date' => ['required', 'date'],
             'expected_checkout_date' => ['nullable', 'date', 'after_or_equal:checkin_date'],
             'status' => ['nullable', Rule::in(['reserved', 'checked_in'])],
+            'discount_amount' => ['nullable', 'numeric', 'min:0'],
+            'creation_source' => ['nullable', Rule::in(['reservations_index', 'dashboard_shortcut'])],
         ];
     }
 }
