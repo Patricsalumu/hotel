@@ -286,7 +286,7 @@ class ReservationController extends Controller
         if (!empty($hotel->image)) {
             $logoPath = storage_path('app/public/' . $hotel->image);
             if (is_file($logoPath)) {
-                $mime = mime_content_type($logoPath) ?: 'image/png';
+                $mime = $this->detectMimeType($logoPath);
                 $logoDataUri = 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($logoPath));
             }
         }
@@ -360,7 +360,7 @@ class ReservationController extends Controller
         if (!empty($hotel->image)) {
             $logoPath = storage_path('app/public/' . $hotel->image);
             if (is_file($logoPath)) {
-                $mime = mime_content_type($logoPath) ?: 'image/png';
+                $mime = $this->detectMimeType($logoPath);
                 $logoDataUri = 'data:' . $mime . ';base64,' . base64_encode((string) file_get_contents($logoPath));
             }
         }
@@ -427,5 +427,26 @@ class ReservationController extends Controller
             $nights = (int) $request->input('nights');
             $query->whereRaw('DATEDIFF(COALESCE(actual_checkout_date, expected_checkout_date, CURDATE()), checkin_date) = ?', [$nights]);
         }
+    }
+
+    private function detectMimeType(string $filePath): string
+    {
+        if (function_exists('mime_content_type')) {
+            $mime = @mime_content_type($filePath);
+            if (is_string($mime) && $mime !== '') {
+                return $mime;
+            }
+        }
+
+        $extension = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
+
+        return match ($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            default => 'application/octet-stream',
+        };
     }
 }

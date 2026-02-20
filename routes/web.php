@@ -69,6 +69,15 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('role:super_admin')->group(function () {
+        Route::get('/superadmin/health/fileinfo', function () {
+            return response()->json([
+                'php_sapi' => PHP_SAPI,
+                'php_version' => PHP_VERSION,
+                'extension_loaded_fileinfo' => extension_loaded('fileinfo'),
+                'class_exists_finfo' => class_exists('finfo'),
+            ]);
+        })->name('superadmin.health.fileinfo');
+
         Route::get('/superadmin/hotels', [SuperAdminHotelController::class, 'index'])->name('superadmin.hotels.index');
         Route::post('/superadmin/hotels', [SuperAdminHotelController::class, 'store'])->name('superadmin.hotels.store');
         Route::post('/superadmin/users', [SuperAdminHotelController::class, 'storeUser'])->name('superadmin.users.store');
