@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreHotelRequest;
 use App\Models\Hotel;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Str;
 
 class HotelController extends Controller
 {
@@ -23,10 +24,13 @@ class HotelController extends Controller
 
         if ($request->hasFile('image')) {
             if ($hotel?->image) {
-                Storage::disk('public')->delete($hotel->image);
+                $previousPath = storage_path('app/public/' . $hotel->image);
+                if (is_file($previousPath)) {
+                    @unlink($previousPath);
+                }
             }
 
-            $data['image'] = $request->file('image')->store('hotels/logos', 'public');
+            $data['image'] = $this->storeLogoFile($request->file('image'));
         }
 
         if ($hotel) {
@@ -40,5 +44,24 @@ class HotelController extends Controller
         $user->update(['hotel_id' => $hotel->id]);
 
         return back()->with('success', 'Hôtel enregistré avec succès.');
+    }
+
+    private function storeLogoFile(?UploadedFile $file): ?string
+    {
+        if (! $file) {
+            return null;
+        }
+
+        $directory = storage_path('app/public/hotels/logos');
+        if (! is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $filename = (string) Str::uuid() . '.' . $extension;
+
+        $file->move($directory, $filename);
+
+        return 'hotels/logos/' . $filename;
     }
 }

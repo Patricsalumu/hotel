@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Hotel;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class SuperAdminHotelController extends Controller
@@ -35,7 +37,7 @@ class SuperAdminHotelController extends Controller
         ]);
 
         if ($request->hasFile('image')) {
-            $data['image'] = $request->file('image')->store('hotels/logos', 'public');
+            $data['image'] = $this->storeLogoFile($request->file('image'));
         }
 
         DB::transaction(function () use ($data) {
@@ -96,5 +98,24 @@ class SuperAdminHotelController extends Controller
         });
 
         return back()->with('success', 'Utilisateur lié à l’hôtel avec succès.');
+    }
+
+    private function storeLogoFile(?UploadedFile $file): ?string
+    {
+        if (! $file) {
+            return null;
+        }
+
+        $directory = storage_path('app/public/hotels/logos');
+        if (! is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+
+        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $filename = (string) Str::uuid() . '.' . $extension;
+
+        $file->move($directory, $filename);
+
+        return 'hotels/logos/' . $filename;
     }
 }
