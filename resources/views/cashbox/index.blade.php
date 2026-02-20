@@ -111,12 +111,35 @@
             <div class="gh-card card table-responsive">
                 <div class="card-header">Sorties (dépenses)</div>
                 <table class="table align-middle mb-0">
-                    <thead class="table-light"><tr><th>Heure</th><th>Compte</th><th>Montant</th><th>Description</th></tr></thead>
+                    <thead class="table-light"><tr><th>Heure</th><th>Compte</th><th>Montant</th><th>Description</th><th>Statut</th><th>Action</th></tr></thead>
                     <tbody>
                         @forelse($expenses as $e)
-                            <tr><td>{{ $e->created_at }}</td><td>{{ $e->account?->name ?? '-' }}</td><td>{{ \App\Support\Money::format($e->amount, $currency) }}</td><td>{{ $e->description }}</td></tr>
+                            <tr>
+                                <td>{{ $e->created_at }}</td>
+                                <td>{{ $e->account?->name ?? '-' }}</td>
+                                <td>{{ \App\Support\Money::format($e->amount, $currency) }}</td>
+                                <td>{{ $e->description }}</td>
+                                <td>
+                                    @if($e->trashed())
+                                        <span class="badge text-bg-secondary">annulée</span>
+                                    @else
+                                        <span class="badge text-bg-success">active</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if(!$e->trashed())
+                                        <form method="POST" action="{{ route('expenses.destroy', $e) }}" onsubmit="return confirm('Annuler cette dépense ?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger">Annuler</button>
+                                        </form>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                            </tr>
                         @empty
-                            <tr><td colspan="4"><div class="gh-empty my-2">Aucune dépense pour la période sélectionnée.</div></td></tr>
+                            <tr><td colspan="6"><div class="gh-empty my-2">Aucune dépense pour la période sélectionnée.</div></td></tr>
                         @endforelse
                     </tbody>
                 </table>

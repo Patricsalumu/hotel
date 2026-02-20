@@ -15,8 +15,12 @@ class PaymentController extends Controller
 
     public function store(StorePaymentRequest $request)
     {
-        $reservation = Reservation::findOrFail($request->integer('reservation_id'));
+        $reservation = Reservation::withTrashed()->findOrFail($request->integer('reservation_id'));
         $this->authorize('update', $reservation);
+
+        if ($reservation->trashed()) {
+            return back()->withErrors(['reservation_id' => 'Cette réservation est annulée. Paiement impossible.']);
+        }
 
         $alreadyPaid = (float) $reservation->payments()->sum('amount');
         $remaining = max(0, (float) $reservation->total_amount - $alreadyPaid);

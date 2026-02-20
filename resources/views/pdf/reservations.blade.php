@@ -33,6 +33,7 @@
     <table>
         <thead>
             <tr>
+                <th>Référence</th>
                 <th>Chambre</th>
                 <th>Client</th>
                 <th>Date d’arrivée</th>
@@ -45,17 +46,18 @@
         <tbody>
         @forelse($reservations as $r)
             <tr>
+                <td>{{ $r->reference }}</td>
                 <td>{{ $r->room->number }}</td>
                 <td>{{ $r->client->name }}</td>
                 <td>{{ $r->checkin_date?->format('Y-m-d') }}</td>
                 <td>{{ $r->expected_checkout_date?->format('Y-m-d') }}</td>
                 <td class="right">{{ \App\Support\Money::format($r->total_amount, $currency) }}</td>
                 <td class="right">{{ \App\Support\Money::format($r->payments->sum('amount'), $currency) }}</td>
-                <td>{{ ['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$r->status] ?? $r->status }} / {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$r->payment_status] ?? $r->payment_status }}</td>
+                <td>{{ $r->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$r->status] ?? $r->status) }} / {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$r->payment_status] ?? $r->payment_status }}</td>
             </tr>
         @empty
             <tr>
-                <td colspan="7">Aucune réservation pour les filtres sélectionnés.</td>
+                <td colspan="8">Aucune réservation pour les filtres sélectionnés.</td>
             </tr>
         @endforelse
         </tbody>

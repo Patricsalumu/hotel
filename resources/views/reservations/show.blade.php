@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
-                <h4 class="mb-1">Détails réservation #{{ $reservation->id }}</h4>
+                <h4 class="mb-1">Détails réservation {{ $reservation->reference }}</h4>
                 <div class="small text-white-50">Informations séjour et encaissement</div>
             </div>
             <div class="d-flex gap-2">
@@ -38,6 +38,7 @@
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Montant déjà payé</div><div class="gh-kpi-value text-success">{{ \App\Support\Money::format($paidAmount, $currency) }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Reste à payer</div><div class="gh-kpi-value text-danger">{{ \App\Support\Money::format($remainingAmount, $currency) }}</div></div></div>
                     <div class="col-md-12"><div class="gh-kpi h-100"><div class="gh-kpi-label">Réservation créée par</div><div class="fw-semibold">{{ $reservation->user?->name ?? $reservation->manager?->name ?? '-' }}</div></div></div>
+                    <div class="col-md-12"><div class="gh-kpi h-100"><div class="gh-kpi-label">Statut</div><div class="fw-semibold">{{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}</div></div></div>
                 </div>
             </div></div>
 
@@ -74,17 +75,21 @@
         <div class="col-md-4">
             <div class="gh-card card"><div class="card-body">
                 <h6 class="mb-3">Encaisser</h6>
-                <form method="POST" action="{{ route('payments.store') }}" class="vstack gap-2">
-                    @csrf
-                    <input type="hidden" name="reservation_id" value="{{ $reservation->id }}">
-                    <input type="number" step="0.01" class="form-control" name="amount" value="{{ $remainingAmount > 0 ? number_format($remainingAmount, 2, '.', '') : '' }}" placeholder="Montant" required>
-                    <select class="form-select" name="payment_method" required>
-                        <option value="cash" selected>Cash</option>
-                        <option value="mobile">Mobile money</option>
-                        <option value="card">Carte bancaire</option>
-                    </select>
-                    <button class="btn gh-btn-primary btn-primary">Valider paiement</button>
-                </form>
+                @if($reservation->trashed())
+                    <div class="alert alert-secondary mb-0">Cette réservation est annulée. Paiement indisponible.</div>
+                @else
+                    <form method="POST" action="{{ route('payments.store') }}" class="vstack gap-2">
+                        @csrf
+                        <input type="hidden" name="reservation_id" value="{{ $reservation->id }}">
+                        <input type="number" step="0.01" class="form-control" name="amount" value="{{ $remainingAmount > 0 ? number_format($remainingAmount, 2, '.', '') : '' }}" placeholder="Montant" required>
+                        <select class="form-select" name="payment_method" required>
+                            <option value="cash" selected>Cash</option>
+                            <option value="mobile">Mobile money</option>
+                            <option value="card">Carte bancaire</option>
+                        </select>
+                        <button class="btn gh-btn-primary btn-primary">Valider paiement</button>
+                    </form>
+                @endif
             </div></div>
         </div>
     </div>

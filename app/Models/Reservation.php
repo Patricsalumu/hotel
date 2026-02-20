@@ -6,11 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 class Reservation extends Model
 {
     use HasFactory;
+    use SoftDeletes;
 
     protected static function booted(): void
     {
@@ -24,6 +26,8 @@ class Reservation extends Model
     protected $fillable = [
         'client_id',
         'room_id',
+        'hotel_id',
+        'reservation_number',
         'manager_id',
         'id_user',
         'checkin_date',
@@ -41,6 +45,8 @@ class Reservation extends Model
         'actual_checkout_date' => 'date',
         'total_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
+        'reservation_number' => 'integer',
+        'deleted_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
@@ -51,6 +57,11 @@ class Reservation extends Model
     public function room(): BelongsTo
     {
         return $this->belongsTo(Room::class);
+    }
+
+    public function hotel(): BelongsTo
+    {
+        return $this->belongsTo(Hotel::class);
     }
 
     public function manager(): BelongsTo
@@ -99,5 +110,10 @@ class Reservation extends Model
         }
 
         return $nights;
+    }
+
+    public function getReferenceAttribute(): string
+    {
+        return 'RES-' . ($this->reservation_number ?? $this->id);
     }
 }

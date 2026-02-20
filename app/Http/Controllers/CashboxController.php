@@ -24,6 +24,7 @@ class CashboxController extends Controller
             ->get();
 
         $expensesQuery = Expense::with('account')
+            ->withTrashed()
             ->where('hotel_id', $hotel->id)
             ->whereBetween('created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
             ->latest('created_at');
@@ -36,7 +37,7 @@ class CashboxController extends Controller
         $expenseAccounts = ExpenseAccount::where('hotel_id', $hotel->id)->orderBy('name')->get();
 
         $totalIn = (float) $payments->sum('amount');
-        $totalOut = (float) $expenses->sum('amount');
+        $totalOut = (float) $expenses->whereNull('deleted_at')->sum('amount');
 
         return view('cashbox.index', compact(
             'payments',
@@ -67,6 +68,7 @@ class CashboxController extends Controller
             ->get();
 
         $expensesQuery = Expense::with('account')
+            ->withTrashed()
             ->where('hotel_id', $hotel->id)
             ->whereBetween('created_at', [$from->copy()->startOfDay(), $to->copy()->endOfDay()])
             ->latest('created_at');
@@ -76,6 +78,7 @@ class CashboxController extends Controller
         }
 
         $expenses = $expensesQuery->get();
+        $totalOut = (float) $expenses->whereNull('deleted_at')->sum('amount');
 
         $enterpriseEmail = $hotel->owner?->email;
         $enterpriseAddress = trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? ''));
@@ -93,6 +96,7 @@ class CashboxController extends Controller
         $pdf = Pdf::loadView('pdf.cashbox', compact(
             'payments',
             'expenses',
+            'totalOut',
             'hotel',
             'from',
             'to',

@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/cashbox/accounts', [ExpenseAccountController::class, 'index'])->name('cashbox.accounts');
     Route::get('/cashbox/pdf', [CashboxController::class, 'exportPdf'])->name('cashbox.pdf');
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+    Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy');
     Route::post('/expense-accounts', [ExpenseAccountController::class, 'store'])->name('expense-accounts.store');
     Route::patch('/expense-accounts/{expense_account}', [ExpenseAccountController::class, 'update'])->name('expense-accounts.update');
 

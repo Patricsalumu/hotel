@@ -125,7 +125,7 @@
         <div class="company-meta">Adresse: {{ trim(($hotel->address ?? '') . ' ' . ($hotel->city ?? '')) ?: '-' }}</div>
         <div class="company-meta">Téléphone: {{ $hotel->phone ?: '-' }} | Mail: {{ $hotel->owner?->email ?? '-' }}</div>
 
-        <div class="title">Facture N° {{ $reservation->id }}</div>
+        <div class="title">Facture N° {{ $reservation->reservation_number ?? $reservation->id }}</div>
         <div class="status">{{ $paymentStatusLabel }}</div>
     </div>
 

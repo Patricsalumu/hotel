@@ -35,8 +35,8 @@
 
     <div class="summary">
         Total entrées: <strong>{{ \App\Support\Money::format($payments->sum('amount'), $currency) }}</strong>
-        | Total sorties: <strong>{{ \App\Support\Money::format($expenses->sum('amount'), $currency) }}</strong>
-        | Net: <strong>{{ \App\Support\Money::format($payments->sum('amount') - $expenses->sum('amount'), $currency) }}</strong>
+        | Total sorties: <strong>{{ \App\Support\Money::format($totalOut, $currency) }}</strong>
+        | Net: <strong>{{ \App\Support\Money::format($payments->sum('amount') - $totalOut, $currency) }}</strong>
     </div>
 
     <div class="section-title">Entrées</div>
@@ -73,6 +73,7 @@
                 <th>Compte</th>
                 <th class="right">Montant</th>
                 <th>Description</th>
+                <th>Statut</th>
             </tr>
         </thead>
         <tbody>
@@ -82,10 +83,11 @@
                 <td>{{ $e->account?->name ?? '-' }}</td>
                 <td class="right">{{ \App\Support\Money::format($e->amount, $currency) }}</td>
                 <td>{{ $e->description }}</td>
+                <td>{{ $e->trashed() ? 'annulée' : 'active' }}</td>
             </tr>
         @empty
             <tr>
-                <td colspan="4">Aucune dépense pour la période sélectionnée.</td>
+                <td colspan="5">Aucune dépense pour la période sélectionnée.</td>
             </tr>
         @endforelse
         </tbody>

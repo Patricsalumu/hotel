@@ -237,13 +237,14 @@
 
     @php
         $currency = $hotel->currency ?? 'FC';
-        $pageTotalAmount = $reservations->sum('total_amount');
-        $pagePaidAmount = $reservations->sum(fn ($reservation) => $reservation->payments->sum('amount'));
+        $activeReservations = $reservations->filter(fn ($reservation) => ! $reservation->trashed());
+        $pageTotalAmount = $activeReservations->sum('total_amount');
+        $pagePaidAmount = $activeReservations->sum(fn ($reservation) => $reservation->payments->sum('amount'));
         $pageRemainingAmount = max(0, $pageTotalAmount - $pagePaidAmount);
     @endphp
 
     <div class="row g-2 mb-3">
-        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Réservations (page)</div><div class="rv-kpi-value">{{ $reservations->count() }}</div></div></div>
+        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Réservations (page)</div><div class="rv-kpi-value">{{ $activeReservations->count() }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Montant total</div><div class="rv-kpi-value">{{ \App\Support\Money::format($pageTotalAmount, $currency) }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Total payé</div><div class="rv-kpi-value text-success">{{ \App\Support\Money::format($pagePaidAmount, $currency) }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Reste à payer</div><div class="rv-kpi-value text-danger">{{ \App\Support\Money::format($pageRemainingAmount, $currency) }}</div></div></div>
@@ -411,8 +412,10 @@
                     $remaining = max(0, $reservation->total_amount - $paid);
                     $clientPhone = preg_replace('/\D+/', '', (string) $reservation->client->phone);
                     $publicInvoiceA4 = \Illuminate\Support\Facades\URL::temporarySignedRoute('reservations.public.invoice.pdf', now()->addDays(7), ['reservation' => $reservation->id, 'paper' => 'a4']);
-                    $waText = "Bonjour {$reservation->client->name},\n";
-                    $waText .= "Reservation #{$reservation->id} - Chambre {$reservation->room->number}\n";
+                    $waText = "Notification - {$hotel->name}\n";
+                    $waText .= "Client: {$reservation->client->name}\n";
+                    $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - Chambre {$reservation->room->number}\n";
+                    $waText .= "Nuitees: {$nights}\n";
                     $waText .= "Total: " . \App\Support\Money::format($gross, $currency) . "\n";
                     $waText .= "Reduction: " . \App\Support\Money::format($discount, $currency) . "\n";
                     $waText .= "Net a payer: " . \App\Support\Money::format($reservation->total_amount, $currency) . "\n";
@@ -424,7 +427,13 @@
                         : 'https://wa.me/?text=' . urlencode($waText);
                 @endphp
                 <tr>
-                    <td><a href="{{ route('reservations.show',$reservation) }}" class="fw-semibold">RES-{{ $reservation->id }}</a></td>
+                    <td>
+                        @if($reservation->trashed())
+                            <span class="fw-semibold text-muted">{{ $reservation->reference }}</span>
+                        @else
+                            <a href="{{ route('reservations.show',$reservation) }}" class="fw-semibold">{{ $reservation->reference }}</a>
+                        @endif
+                    </td>
                     <td>{{ $reservation->room->number }}</td>
                     <td class="rv-client">{{ $reservation->client->name }}</td>
                     <td>{{ $reservation->checkin_date?->format('Y-m-d') }}</td>
@@ -436,23 +445,28 @@
                     <td><span class="text-danger fw-semibold">{{ \App\Support\Money::format($remaining, $currency) }}</span></td>
                     <td>
                         <div class="rv-inline-tools">
-                        <span class="badge text-bg-{{ $reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info') }}">{{ ['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status }}</span>
+                        <span class="badge text-bg-{{ $reservation->trashed() ? 'secondary' : ($reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info')) }}">{{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}</span>
                         <span class="badge text-bg-{{ $reservation->payment_status === 'paid' ? 'success' : ($reservation->payment_status === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$reservation->payment_status] ?? $reservation->payment_status }}</span>
 
                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
 
-                        @if($remaining > 0)
+                        @if($remaining > 0 && !$reservation->trashed())
                             <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#paymentModal{{ $reservation->id }}" title="Payer" aria-label="Payer">💳</button>
                         @else
                             <button class="btn btn-sm btn-outline-dark" type="button" title="Déjà payé" aria-label="Déjà payé" disabled>💳</button>
                         @endif
 
-                        @if($reservation->status === 'reserved')
+                        @if($reservation->status === 'reserved' && !$reservation->trashed())
                             <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success" title="Check-in" aria-label="Check-in">✅</button></form>
                         @else
                             <button class="btn btn-sm btn-outline-success" type="button" title="Check-in" aria-label="Check-in" disabled>✅</button>
                         @endif
-                        <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger" title="Check-out" aria-label="Check-out">↩</button></form>
+                        @if(!$reservation->trashed())
+                            <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger" title="Check-out" aria-label="Check-out">↩</button></form>
+                            <form method="POST" action="{{ route('reservations.update',$reservation) }}" onsubmit="return confirm('Annuler cette réservation ?')">@csrf @method('PUT')<input type="hidden" name="action" value="cancel"><button class="btn btn-sm btn-outline-secondary" title="Annuler" aria-label="Annuler">✖</button></form>
+                        @else
+                            <button class="btn btn-sm btn-outline-secondary" type="button" title="Annulée" aria-label="Annulée" disabled>✖</button>
+                        @endif
                         </div>
 
                         <div class="modal fade" id="downloadInvoiceModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
@@ -471,7 +485,7 @@
                             </div>
                         </div>
 
-                        @if($remaining > 0)
+                        @if($remaining > 0 && !$reservation->trashed())
                             <div class="modal fade" id="paymentModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog">
                                     <div class="modal-content">
@@ -581,7 +595,8 @@
                 if (dayReservations.length > 0) {
                     html += '<div class="calendar-reservations">';
                     dayReservations.forEach(res => {
-                        html += `<div class="calendar-reservation-item" title="Chambre ${res.room_number} - ${res.client_name}">📋 Chambre ${res.room_number}</div>`;
+                        const icon = res.is_cancelled ? '❌' : '📋';
+                        html += `<div class="calendar-reservation-item" title="${res.reference} - Chambre ${res.room_number} - ${res.client_name}">${icon} Chambre ${res.room_number}</div>`;
                     });
                     html += '</div>';
                 }

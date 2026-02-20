@@ -11,7 +11,9 @@ use App\Support\Money;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\ValidationException;
 
 class ReservationController extends Controller
 {
@@ -26,6 +28,7 @@ class ReservationController extends Controller
         $currency = $hotel->currency ?? 'FC';
 
         $query = Reservation::query()
+            ->withTrashed()
             ->with(['client', 'room.apartment', 'payments'])
             ->whereHas('room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id));
 
@@ -50,8 +53,8 @@ class ReservationController extends Controller
             ->get();
         $occupiedNumbers = $occupiedRooms->pluck('number')->toArray();
 
-        // total received today for the filtered reservations (payments)
-        $reservationsForTotals = $reservations->getCollection();
+        // total received for active (non-cancelled) reservations in current page/filter
+        $reservationsForTotals = $reservations->getCollection()->filter(fn ($r) => ! $r->trashed());
         $todayReceived = $reservationsForTotals->sum(fn ($r) => $r->payments->sum('amount'));
 
         // expenses today
@@ -91,11 +94,13 @@ class ReservationController extends Controller
         // prepare calendar-friendly reservations data to avoid Blade parsing issues
         $calendarReservations = $reservations->getCollection()->map(fn ($r) => [
             'id' => $r->id,
+            'reference' => $r->reference,
             'room_number' => $r->room->number,
             'client_name' => $r->client->name,
             'checkin' => $r->checkin_date?->format('Y-m-d'),
             'checkout' => $r->expected_checkout_date?->format('Y-m-d'),
             'status' => $r->status,
+            'is_cancelled' => $r->trashed(),
         ])->values()->toArray();
 
         return view('reservations.index', compact(
@@ -148,27 +153,45 @@ class ReservationController extends Controller
             ->where('hotel_id', $hotel->id)
             ->firstOrFail();
 
-        $reservation = Reservation::create([
-            'client_id' => $client->id,
-            'room_id' => $room->id,
-            'manager_id' => $request->user()->id,
-            'id_user' => $request->user()->id,
-            'checkin_date' => $request->date('checkin_date'),
-            'expected_checkout_date' => $expectedCheckoutDate,
-            'status' => $initialStatus,
-            'payment_status' => 'unpaid',
-            'total_amount' => 0,
-            'discount_amount' => (float) $request->input('discount_amount', 0),
-        ]);
+        $reservation = DB::transaction(function () use ($hotel, $room, $request, $client, $expectedCheckoutDate, $initialStatus, $roomStatus) {
+            $lockedRoom = Room::whereKey($room->id)->lockForUpdate()->firstOrFail();
+            if ($lockedRoom->status === 'occupied') {
+                throw ValidationException::withMessages([
+                    'room_id' => 'Cette chambre est déjà occupée et ne peut pas être réservée.',
+                ]);
+            }
 
-        $reservation->refresh();
-        $reservation->update([
-            'total_amount' => $this->billingService->computeTotal($reservation, $hotel),
-        ]);
+            $nextReservationNumber = (int) Reservation::withTrashed()
+                ->where('hotel_id', $hotel->id)
+                ->lockForUpdate()
+                ->max('reservation_number') + 1;
 
-        $room->update([
-            'status' => $roomStatus,
-        ]);
+            $reservation = Reservation::create([
+                'client_id' => $client->id,
+                'room_id' => $lockedRoom->id,
+                'hotel_id' => $hotel->id,
+                'reservation_number' => $nextReservationNumber,
+                'manager_id' => $request->user()->id,
+                'id_user' => $request->user()->id,
+                'checkin_date' => $request->date('checkin_date'),
+                'expected_checkout_date' => $expectedCheckoutDate,
+                'status' => $initialStatus,
+                'payment_status' => 'unpaid',
+                'total_amount' => 0,
+                'discount_amount' => (float) $request->input('discount_amount', 0),
+            ]);
+
+            $reservation->refresh();
+            $reservation->update([
+                'total_amount' => $this->billingService->computeTotal($reservation, $hotel),
+            ]);
+
+            $lockedRoom->update([
+                'status' => $roomStatus,
+            ]);
+
+            return $reservation->load('payments');
+        });
         $availableRooms = Room::where('status', 'available')
             ->whereHas('apartment', fn($q) =>
                 $q->where('hotel_id', $hotel->id)
@@ -224,8 +247,10 @@ class ReservationController extends Controller
             ['reservation' => $reservation->id, 'paper' => 'a4']
         );
 
-        $waText = "Bonjour {$reservation->client->name},\n";
-        $waText .= "Reservation #{$reservation->id} - Chambre {$reservation->room->number}\n";
+        $waText = "Notification ({$hotel->name})\n";
+        $waText .= "Client: {$reservation->client->name}\n";
+        $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - Chambre {$reservation->room->number}\n";
+        $waText .= "Nuitees: {$nights}\n";
         $waText .= "Total: " . Money::format($grossAmount, $currency) . "\n";
         $waText .= "Reduction: " . Money::format($discountAmount, $currency) . "\n";
         $waText .= "Net a payer: " . Money::format($netAmount, $currency) . "\n";
@@ -243,6 +268,17 @@ class ReservationController extends Controller
     public function update(Request $request, Reservation $reservation)
     {
         $action = $request->input('action');
+
+        if ($reservation->trashed()) {
+            return back()->withErrors(['reservation' => 'Cette réservation est déjà annulée.']);
+        }
+
+        if ($action === 'cancel') {
+            $reservation->delete();
+            $reservation->room->update(['status' => 'available']);
+
+            return back()->with('success', 'Réservation annulée avec succès.');
+        }
 
         if ($action === 'checkin') {
             $reservation->update(['status' => 'checked_in']);
@@ -271,11 +307,13 @@ class ReservationController extends Controller
         $hotel->loadMissing('owner');
 
         $query = Reservation::query()
+            ->withTrashed()
             ->with(['client', 'room', 'payments'])
             ->whereHas('room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
             ->latest();
 
         $this->applyFilters($query, $request);
+        $query->whereNull('deleted_at');
         $reservations = $query->get();
 
         $enterpriseEmail = $hotel->owner?->email;
@@ -309,7 +347,7 @@ class ReservationController extends Controller
         $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
         [, $pdf] = $this->buildInvoicePdf($reservation, $paper);
 
-        return $pdf->download('facture-reservation-' . $reservation->id . '-' . $paper . '.pdf');
+        return $pdf->download('facture-reservation-' . ($reservation->reservation_number ?? $reservation->id) . '-' . $paper . '.pdf');
     }
 
     public function publicInvoicePdf(Request $request, Reservation $reservation)
@@ -321,7 +359,7 @@ class ReservationController extends Controller
         $paper = $request->query('paper', 'a4') === '80mm' ? '80mm' : 'a4';
         [, $pdf] = $this->buildInvoicePdf($reservation, $paper);
 
-        return $pdf->download('facture-reservation-' . $reservation->id . '-' . $paper . '.pdf');
+        return $pdf->download('facture-reservation-' . ($reservation->reservation_number ?? $reservation->id) . '-' . $paper . '.pdf');
     }
 
     private function buildInvoicePdf(Reservation $reservation, string $paper): array
@@ -405,7 +443,8 @@ class ReservationController extends Controller
         } else {
             $query->where(function ($subQuery) {
                 $subQuery->whereDate('checkin_date', today())
-                    ->orWhere('status', 'reserved');
+                    ->orWhere('status', 'reserved')
+                    ->orWhereNotNull('deleted_at');
             });
         }
 
