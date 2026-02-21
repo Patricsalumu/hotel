@@ -2,6 +2,23 @@
 
 use Illuminate\Support\Str;
 
+$sessionDomain = env('SESSION_DOMAIN');
+if (is_string($sessionDomain) && in_array(strtolower(trim($sessionDomain)), ['', 'null'], true)) {
+    $sessionDomain = null;
+}
+
+$sessionSecureCookie = env('SESSION_SECURE_COOKIE');
+if (is_string($sessionSecureCookie)) {
+    $normalizedSecure = strtolower(trim($sessionSecureCookie));
+    if (in_array($normalizedSecure, ['1', 'true', 'yes', 'on'], true)) {
+        $sessionSecureCookie = true;
+    } elseif (in_array($normalizedSecure, ['0', 'false', 'no', 'off'], true)) {
+        $sessionSecureCookie = false;
+    } else {
+        $sessionSecureCookie = null;
+    }
+}
+
 return [
 
     /*
@@ -155,7 +172,7 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    'domain' => $sessionDomain,
 
     /*
     |--------------------------------------------------------------------------
@@ -168,7 +185,7 @@ return [
     |
     */
 
-    'secure' => (bool) env('SESSION_SECURE_COOKIE', env('APP_ENV') === 'production'),
+    'secure' => $sessionSecureCookie ?? (env('APP_ENV') === 'production'),
 
     /*
     |--------------------------------------------------------------------------
