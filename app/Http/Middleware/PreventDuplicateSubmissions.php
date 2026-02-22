@@ -12,13 +12,24 @@ class PreventDuplicateSubmissions
 {
     private const SESSION_KEY = '_submission_ids';
     private const FALLBACK_WINDOW_SECONDS = 12;
+    private const EXCLUDED_ROUTE_NAMES = [
+        'login',
+        'logout',
+        'password.request',
+        'password.email',
+        'password.reset',
+        'password.store',
+        'password.confirm',
+        'password.update',
+        'verification.send',
+    ];
 
     /**
      * Handle an incoming request.
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $this->isStateChangingRequest($request) || ! $request->hasSession()) {
+        if (! $this->isStateChangingRequest($request) || ! $request->hasSession() || $this->shouldSkip($request)) {
             return $next($request);
         }
 
@@ -41,6 +52,13 @@ class PreventDuplicateSubmissions
     private function isStateChangingRequest(Request $request): bool
     {
         return in_array($request->method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true);
+    }
+
+    private function shouldSkip(Request $request): bool
+    {
+        $routeName = (string) optional($request->route())->getName();
+
+        return in_array($routeName, self::EXCLUDED_ROUTE_NAMES, true);
     }
 
     private function resolveSubmissionId(Request $request): string

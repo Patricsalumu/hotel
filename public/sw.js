@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hotel-pwa-v1';
+const CACHE_NAME = 'hotel-pwa-v2';
 const ASSETS_TO_CACHE = [
     '/',
     '/manifest.webmanifest',
@@ -9,6 +9,25 @@ const ASSETS_TO_CACHE = [
     '/pwa-h-icon.svg',
     '/favicon.ico',
 ];
+
+const STATIC_EXTENSIONS = [
+    '.js',
+    '.css',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.svg',
+    '.webp',
+    '.ico',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.map',
+    '.json',
+    '.webmanifest',
+];
+
+const isStaticAsset = (requestUrl) => STATIC_EXTENSIONS.some((ext) => requestUrl.pathname.endsWith(ext));
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -35,21 +54,39 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    const requestUrl = new URL(event.request.url);
+
+    if (requestUrl.origin !== self.location.origin) {
+        return;
+    }
+
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => response)
+                .catch(() => caches.match('/'))
+        );
+
+        return;
+    }
+
+    if (!isStaticAsset(requestUrl)) {
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request).then((cached) => {
-            if (cached) {
-                return cached;
-            }
-
-            return fetch(event.request)
+            const networkFetch = fetch(event.request)
                 .then((response) => {
                     if (response && response.status === 200 && response.type === 'basic') {
                         const responseClone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
                     }
+
                     return response;
-                })
-                .catch(() => caches.match('/'));
-        })
+                });
+
+            return cached || networkFetch;
+        }).catch(() => caches.match(event.request))
     );
 });
