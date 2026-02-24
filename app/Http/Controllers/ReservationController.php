@@ -286,15 +286,23 @@ class ReservationController extends Controller
         }
 
         if ($action === 'checkout') {
-            $reservation->update([
-                'status' => 'checked_out',
-                'actual_checkout_date' => today(),
-            ]);
-            $hotel = $request->user()->currentHotel();
-            $reservation->update([
-                'total_amount' => $this->billingService->computeTotal($reservation->fresh(), $hotel),
-            ]);
-            $reservation->room->update(['status' => 'available']);
+            DB::transaction(function () use ($request, $reservation): void {
+                $reservation->loadMissing('room.apartment.hotel');
+
+                $reservation->update([
+                    'status' => 'checked_out',
+                    'actual_checkout_date' => today(),
+                ]);
+
+                $reservation->room()->update(['status' => 'available']);
+
+                $hotel = $request->user()->currentHotel() ?? $reservation->room->apartment->hotel;
+                if ($hotel) {
+                    $reservation->update([
+                        'total_amount' => $this->billingService->computeTotal($reservation->fresh(), $hotel),
+                    ]);
+                }
+            });
         }
 
         return back()->with('success', 'Statut de la réservation mis à jour avec succès.');
