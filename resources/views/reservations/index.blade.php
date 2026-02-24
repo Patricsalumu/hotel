@@ -238,7 +238,13 @@
     @php
         $currency = $hotel->currency ?? 'FC';
         $activeReservations = $reservations->filter(fn ($reservation) => ! $reservation->trashed());
-        $pageTotalAmount = $activeReservations->sum('total_amount');
+        $pageTotalAmount = $activeReservations->sum(function ($reservation) use ($hotel) {
+            $nights = $reservation->computeNights(now(), $hotel->checkout_time);
+            $gross = (float) $reservation->room->price_per_night * $nights;
+            $discount = (float) ($reservation->discount_amount ?? 0);
+
+            return max(0, $gross - $discount);
+        });
         $pagePaidAmount = $activeReservations->sum(fn ($reservation) => $reservation->payments->sum('amount'));
         $pageRemainingAmount = max(0, $pageTotalAmount - $pagePaidAmount);
     @endphp
@@ -408,8 +414,10 @@
                     $nights = $reservation->computeNights(now(), $hotel->checkout_time);
                     $gross = (float) $reservation->room->price_per_night * $nights;
                     $discount = (float) ($reservation->discount_amount ?? 0);
+                    $netTotal = max(0, $gross - $discount);
                     $paid = $reservation->payments->sum('amount');
-                    $remaining = max(0, $reservation->total_amount - $paid);
+                    $remaining = max(0, $netTotal - $paid);
+                    $derivedPaymentStatus = $paid <= 0 ? 'unpaid' : ($paid >= $netTotal ? 'paid' : 'partial');
                     $clientPhone = preg_replace('/\D+/', '', (string) $reservation->client->phone);
                     $publicInvoiceA4 = \Illuminate\Support\Facades\URL::temporarySignedRoute('reservations.public.invoice.pdf', now()->addDays(7), ['reservation' => $reservation->id, 'paper' => 'a4']);
                     $waText = "Notification - {$hotel->name}\n";
@@ -418,7 +426,7 @@
                     $waText .= "Nuitees: {$nights}\n";
                     $waText .= "Total: " . \App\Support\Money::format($gross, $currency) . "\n";
                     $waText .= "Reduction: " . \App\Support\Money::format($discount, $currency) . "\n";
-                    $waText .= "Net a payer: " . \App\Support\Money::format($reservation->total_amount, $currency) . "\n";
+                    $waText .= "Net a payer: " . \App\Support\Money::format($netTotal, $currency) . "\n";
                     $waText .= "Paye: " . \App\Support\Money::format($paid, $currency) . "\n";
                     $waText .= "Reste: " . \App\Support\Money::format($remaining, $currency) . "\n";
                     $waText .= "Facture A4: {$publicInvoiceA4}";
@@ -440,13 +448,13 @@
                     <td>{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $reservation->actual_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $nights }}</td>
-                    <td><span class="fw-semibold">{{ \App\Support\Money::format($reservation->total_amount, $currency) }}</span></td>
+                    <td><span class="fw-semibold">{{ \App\Support\Money::format($netTotal, $currency) }}</span></td>
                     <td><span class="text-success fw-semibold">{{ \App\Support\Money::format($paid, $currency) }}</span></td>
                     <td><span class="text-danger fw-semibold">{{ \App\Support\Money::format($remaining, $currency) }}</span></td>
                     <td>
                         <div class="rv-inline-tools">
                         <span class="badge text-bg-{{ $reservation->trashed() ? 'secondary' : ($reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info')) }}">{{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}</span>
-                        <span class="badge text-bg-{{ $reservation->payment_status === 'paid' ? 'success' : ($reservation->payment_status === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$reservation->payment_status] ?? $reservation->payment_status }}</span>
+                        <span class="badge text-bg-{{ $derivedPaymentStatus === 'paid' ? 'success' : ($derivedPaymentStatus === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$derivedPaymentStatus] }}</span>
 
                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
 

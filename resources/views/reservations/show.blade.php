@@ -21,7 +21,7 @@
             $grossAmount = (float) $reservation->room->price_per_night * $nights;
             $discountAmount = (float) ($reservation->discount_amount ?? 0);
             $paidAmount = $reservation->payments->sum('amount');
-            $netAmount = (float) $reservation->total_amount;
+            $netAmount = max(0, $grossAmount - $discountAmount);
             $remainingAmount = max(0, $netAmount - (float) $paidAmount);
         @endphp
         <div class="col-md-8">

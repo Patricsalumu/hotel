@@ -15,11 +15,20 @@ class PaymentController extends Controller
 
     public function store(StorePaymentRequest $request)
     {
-        $reservation = Reservation::withTrashed()->findOrFail($request->integer('reservation_id'));
+        $reservation = Reservation::withTrashed()
+            ->with(['room.apartment.hotel'])
+            ->findOrFail($request->integer('reservation_id'));
         $this->authorize('update', $reservation);
 
         if ($reservation->trashed()) {
             return back()->withErrors(['reservation_id' => 'Cette réservation est annulée. Paiement impossible.']);
+        }
+
+        $hotel = $reservation->room->apartment->hotel;
+        $computedTotal = $this->billingService->computeTotal($reservation, $hotel);
+        if ((float) $reservation->total_amount !== (float) $computedTotal) {
+            $reservation->update(['total_amount' => $computedTotal]);
+            $reservation->refresh();
         }
 
         $alreadyPaid = (float) $reservation->payments()->sum('amount');
