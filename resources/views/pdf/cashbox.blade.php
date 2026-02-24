@@ -55,7 +55,7 @@
                 <td>{{ $p->created_at }}</td>
                 <td>{{ $p->reservation->room->number ?? '-' }}</td>
                 <td class="right">{{ \App\Support\Money::format($p->amount, $currency) }}</td>
-                <td>{{ ['cash' => 'Espèces', 'mobile' => 'Mobile money', 'card' => 'Carte'][($p->payment_method)] ?? $p->payment_method }}</td>
+                <td>{{ ['cash' => 'Espèces', 'mpesa' => 'Mpesa', 'airtelmoney' => 'Airtel Money', 'card' => 'Carte'][($p->payment_method)] ?? $p->payment_method }}</td>
             </tr>
         @empty
             <tr>

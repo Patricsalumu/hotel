@@ -84,9 +84,14 @@
                                     <strong>#{{ $room->number }}</strong>
                                     <span class="badge text-bg-{{ $room->status === 'occupied' ? 'danger' : ($room->status === 'reserved' ? 'warning' : 'success') }}">{{ ['occupied' => 'occupée', 'reserved' => 'réservée', 'available' => 'libre'][$room->status] ?? $room->status }}</span>
                                 </div>
-                                <div class="small text-muted mt-1">{{ $room->apartment->name ?? '-' }} • {{ ucfirst($room->type) }}</div>
-                                @if($room->status === 'occupied' && $latest)
-                                    <div class="small mt-2">Client: {{ $latest->client->name ?? '-' }}</div>
+                                @if(in_array($room->status, ['occupied', 'reserved'], true) && $latest)
+                                    @php
+                                        $nights = $latest->computeNights(now(), $hotel->checkout_time);
+                                        $checkin = $latest->checkin_date?->format('Y-m-d') ?? '';
+                                        $expected = $latest->expected_checkout_date?->format('Y-m-d');
+                                    @endphp
+                                    <div class="small mt-2">{{ $checkin }}@if($expected) - {{ $expected }}@endif</div>
+                                    <div class="small text-muted">{{ $latest->client->name ?? '-' }} • {{ $nights }} nuitée(s)</div>
                                     <a href="{{ route('reservations.show', $latest) }}" class="btn btn-sm btn-outline-primary mt-2">Voir réservation</a>
                                 @elseif($room->status === 'available')
                                     <button class="btn btn-sm gh-btn-primary btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#reservationModal" data-room-id="{{ $room->id }}" data-room-number="{{ $room->number }}" data-room-price="{{ (float) $room->price_per_night }}">Créer réservation</button>
@@ -135,6 +140,7 @@
                                 <input type="number" step="0.01" min="0" class="form-control" id="dashboardDiscountAmount" name="discount_amount" value="{{ old('discount_amount', 0) }}" placeholder="0">
                             </div>
                             <div class="mt-3 border rounded p-2 bg-light">
+                                <div class="d-flex justify-content-between"><span>Nuitées</span><strong id="dashboardNightsCount">1</strong></div>
                                 <div class="d-flex justify-content-between"><span>Total à payer</span><strong id="dashboardGrossAmount">0 {{ $currency }}</strong></div>
                                 <div class="d-flex justify-content-between"><span>Réduction</span><strong id="dashboardDiscountPreview">0 {{ $currency }}</strong></div>
                                 <div class="d-flex justify-content-between"><span>Net à payer</span><strong id="dashboardNetAmount">0 {{ $currency }}</strong></div>
@@ -194,6 +200,7 @@
             const dashboardCheckinDate = document.getElementById('dashboardCheckinDate');
             const dashboardCheckoutDate = document.getElementById('dashboardCheckoutDate');
             const dashboardDiscountAmount = document.getElementById('dashboardDiscountAmount');
+            const dashboardNightsCount = document.getElementById('dashboardNightsCount');
             const dashboardGrossAmount = document.getElementById('dashboardGrossAmount');
             const dashboardDiscountPreview = document.getElementById('dashboardDiscountPreview');
             const dashboardNetAmount = document.getElementById('dashboardNetAmount');
@@ -219,6 +226,7 @@
                 const discount = Math.max(0, Number(dashboardDiscountAmount?.value || 0));
                 const net = Math.max(0, gross - discount);
 
+                if (dashboardNightsCount) dashboardNightsCount.textContent = String(nights);
                 if (dashboardGrossAmount) dashboardGrossAmount.textContent = formatMoney(gross);
                 if (dashboardDiscountPreview) dashboardDiscountPreview.textContent = formatMoney(discount);
                 if (dashboardNetAmount) dashboardNetAmount.textContent = formatMoney(net);

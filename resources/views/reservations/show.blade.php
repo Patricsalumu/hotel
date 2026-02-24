@@ -59,7 +59,7 @@
                             <tr>
                                 <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
                                 <td class="fw-semibold">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
-                                <td>{{ ['cash' => 'Cash', 'mobile' => 'Mobile money', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
+                                <td>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money','mpesa' => 'Mpesa', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
                                 <td>{{ $payment->user?->name ?? '-' }}</td>
                             </tr>
                         @empty
@@ -84,7 +84,8 @@
                         <input type="number" step="0.01" class="form-control" name="amount" value="{{ $remainingAmount > 0 ? number_format($remainingAmount, 2, '.', '') : '' }}" placeholder="Montant" required>
                         <select class="form-select" name="payment_method" required>
                             <option value="cash" selected>Cash</option>
-                            <option value="mobile">Mobile money</option>
+                            <option value="airtelmoney">Airtel money</option>
+                            <option value="mpesa">Mpesa</option>
                             <option value="card">Carte bancaire</option>
                         </select>
                         <button class="btn gh-btn-primary btn-primary">Valider paiement</button>

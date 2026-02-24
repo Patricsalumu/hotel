@@ -506,7 +506,8 @@
                                                     <select class="form-select" name="payment_method" required>
                                                         <option value="cash" selected>Cash</option>
                                                         <option value="card">Carte bancaire</option>
-                                                        <option value="mobile">Mobile money</option>
+                                                        <option value="airtelmoney">Airtel money</option>
+                                                        <option value="mpesa">Mpesa</option>
                                                     </select>
                                                 </div>
                                             </div>

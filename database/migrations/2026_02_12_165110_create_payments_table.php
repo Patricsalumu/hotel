@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('reservation_id')->constrained()->cascadeOnDelete();
             $table->decimal('amount', 12, 2);
-            $table->enum('payment_method', ['cash', 'mobile', 'card'])->default('cash');
+            $table->enum('payment_method', ['cash', 'airtelmoney', 'mpesa', 'card'])->default('cash');
             $table->timestamp('created_at')->useCurrent();
         });
     }

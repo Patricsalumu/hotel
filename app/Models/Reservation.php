@@ -103,7 +103,7 @@ class Reservation extends Model
             $end = $now->copy()->startOfDay();
         }
 
-        $nights = max(1, $start->diffInDays($end));
+        $nights = max(1, $start->diffInDays($end, false));
 
         if ($usingCurrentDate && $now->format('H:i') > Carbon::parse($checkoutTime)->format('H:i')) {
             $nights++;

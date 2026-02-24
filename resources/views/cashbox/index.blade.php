@@ -99,7 +99,7 @@
                     <thead class="table-light"><tr><th>Heure</th><th>Chambre</th><th>Montant</th><th>Méthode</th></tr></thead>
                     <tbody>
                         @forelse($payments as $p)
-                            <tr><td>{{ $p->created_at }}</td><td>{{ $p->reservation->room->number ?? '-' }}</td><td>{{ \App\Support\Money::format($p->amount, $currency) }}</td><td>{{ ['cash' => 'Espèces', 'mobile' => 'Mobile money', 'card' => 'Carte'][$p->payment_method] ?? $p->payment_method }}</td></tr>
+                            <tr><td>{{ $p->created_at }}</td><td>{{ $p->reservation->room->number ?? '-' }}</td><td>{{ \App\Support\Money::format($p->amount, $currency) }}</td><td>{{ ['cash' => 'Espèces', 'airtelmoney' => 'Airtel money', 'mpesa' => 'Mpesa', 'card' => 'Carte'][$p->payment_method] ?? $p->payment_method }}</td></tr>
                         @empty
                             <tr><td colspan="4"><div class="gh-empty my-2">Aucune entrée pour la période sélectionnée.</div></td></tr>
                         @endforelse

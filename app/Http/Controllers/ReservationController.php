@@ -98,7 +98,7 @@ class ReservationController extends Controller
             'room_number' => $r->room->number,
             'client_name' => $r->client->name,
             'checkin' => $r->checkin_date?->format('Y-m-d'),
-            'checkout' => $r->expected_checkout_date?->format('Y-m-d'),
+            'checkout' => ($r->actual_checkout_date ?? $r->expected_checkout_date ?? now())->format('Y-m-d'),
             'status' => $r->status,
             'is_cancelled' => $r->trashed(),
         ])->values()->toArray();
@@ -133,7 +133,7 @@ class ReservationController extends Controller
 
         $expectedCheckoutDate = $request->date('expected_checkout_date')
             ? Carbon::parse($request->date('expected_checkout_date'))->toDateString()
-            : Carbon::parse($request->date('checkin_date'))->toDateString();
+            : null;
 
         // determine initial reservation status based on checkin date relative to today
         $checkinDate = Carbon::parse($request->date('checkin_date'))->toDateString();
@@ -381,9 +381,11 @@ class ReservationController extends Controller
         $totalAmount = max(0, $grossAmount - $discountAmount);
         $remainingAmount = max(0, $totalAmount - $paidAmount);
 
-        $expectedNights = $reservation->expected_checkout_date
-            ? max(1, $reservation->checkin_date->diffInDays($reservation->expected_checkout_date))
-            : 1;
+        $expectedEndDate = $reservation->expected_checkout_date
+            ?? $reservation->actual_checkout_date
+            ?? now()->startOfDay();
+
+        $expectedNights = max(1, $reservation->checkin_date->startOfDay()->diffInDays($expectedEndDate->startOfDay(), false));
 
         $actualNights = $reservation->computeNights(now(), $hotel->checkout_time);
         $pricePerNight = $actualNights > 0 ? round($grossAmount / $actualNights, 2) : $grossAmount;
