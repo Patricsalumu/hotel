@@ -32,7 +32,6 @@
 
         .rv-table td {
             vertical-align: middle;
-            white-space: nowrap;
         }
 
         .rv-client {
@@ -45,25 +44,25 @@
             display: flex;
             gap: .35rem;
             flex-wrap: wrap;
-            min-width: 150px;
         }
 
         .rv-inline-tools {
             display: flex;
+            flex-direction: column;
             gap: .35rem;
-            flex-wrap: nowrap;
-            align-items: center;
-            white-space: nowrap;
-            min-width: 320px;
-        }
-        .rv-inline-tools form {
-            display: inline-block;
-            margin: 0;
+            min-width: 0;
         }
 
-        .rv-inline-tools > :not(.modal) {
-            display: inline-block !important;
-            margin-right: .2rem;
+        .rv-inline-tools .rv-action-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .35rem;
+            align-items: center;
+        }
+
+        .rv-inline-tools .rv-action-row form {
+            display: inline-block;
+            margin: 0;
         }
 
         .rv-inline-tools .btn {
@@ -407,7 +406,7 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 rv-table">
-            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Reste</th><th>Suivi</th></tr></thead>
+            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Suivi</th></tr></thead>
             <tbody>
             @forelse($reservations as $reservation)
                 @php
@@ -450,31 +449,57 @@
                     <td>{{ $nights }}</td>
                     <td><span class="fw-semibold">{{ \App\Support\Money::format($netTotal, $currency) }}</span></td>
                     <td><span class="text-success fw-semibold">{{ \App\Support\Money::format($paid, $currency) }}</span></td>
-                    <td><span class="text-danger fw-semibold">{{ \App\Support\Money::format($remaining, $currency) }}</span></td>
                     <td>
                         <div class="rv-inline-tools">
-                        <span class="badge text-bg-{{ $reservation->trashed() ? 'secondary' : ($reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info')) }}">{{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}</span>
-                        <span class="badge text-bg-{{ $derivedPaymentStatus === 'paid' ? 'success' : ($derivedPaymentStatus === 'partial' ? 'warning' : 'danger') }}">{{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$derivedPaymentStatus] }}</span>
+                            <div class="rv-action-row">
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal"
+                                        data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
 
-                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
+                                @if($remaining > 0 && !$reservation->trashed())
+                                    <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal"
+                                            data-bs-target="#paymentModal{{ $reservation->id }}" title="Payer" aria-label="Payer">💳</button>
+                                @else
+                                    <button class="btn btn-sm btn-outline-dark" type="button" title="Déjà payé" aria-label="Déjà payé" disabled>💳</button>
+                                @endif
 
-                        @if($remaining > 0 && !$reservation->trashed())
-                            <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal" data-bs-target="#paymentModal{{ $reservation->id }}" title="Payer" aria-label="Payer">💳</button>
-                        @else
-                            <button class="btn btn-sm btn-outline-dark" type="button" title="Déjà payé" aria-label="Déjà payé" disabled>💳</button>
-                        @endif
+                                @if($reservation->status === 'reserved' && !$reservation->trashed())
+                                    <form method="POST" action="{{ route('reservations.update',$reservation) }}">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="action" value="checkin">
+                                        <button class="btn btn-sm btn-outline-success" title="Check-in" aria-label="Check-in">✅</button>
+                                    </form>
+                                @else
+                                    <button class="btn btn-sm btn-outline-success" type="button" title="Check-in" aria-label="Check-in" disabled>✅</button>
+                                @endif
 
-                        @if($reservation->status === 'reserved' && !$reservation->trashed())
-                            <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkin"><button class="btn btn-sm btn-outline-success" title="Check-in" aria-label="Check-in">✅</button></form>
-                        @else
-                            <button class="btn btn-sm btn-outline-success" type="button" title="Check-in" aria-label="Check-in" disabled>✅</button>
-                        @endif
-                        @if(!$reservation->trashed())
-                            <form method="POST" action="{{ route('reservations.update',$reservation) }}">@csrf @method('PUT')<input type="hidden" name="action" value="checkout"><button class="btn btn-sm btn-outline-danger" title="Check-out" aria-label="Check-out">↩</button></form>
-                            <form method="POST" action="{{ route('reservations.update',$reservation) }}" onsubmit="return confirm('Annuler cette réservation ?')">@csrf @method('PUT')<input type="hidden" name="action" value="cancel"><button class="btn btn-sm btn-outline-secondary" title="Annuler" aria-label="Annuler">✖</button></form>
-                        @else
-                            <button class="btn btn-sm btn-outline-secondary" type="button" title="Annulée" aria-label="Annulée" disabled>✖</button>
-                        @endif
+                                @if(!$reservation->trashed())
+                                    <form method="POST" action="{{ route('reservations.update',$reservation) }}">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="action" value="checkout">
+                                        <button class="btn btn-sm btn-outline-danger" title="Check-out" aria-label="Check-out">↩</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('reservations.update',$reservation) }}" onsubmit="return confirm('Annuler cette réservation ?')">
+                                        @csrf
+                                        @method('PUT')
+                                        <input type="hidden" name="action" value="cancel">
+                                        <button class="btn btn-sm btn-outline-secondary" title="Annuler" aria-label="Annuler">✖</button>
+                                    </form>
+                                @else
+                                    <button class="btn btn-sm btn-outline-danger" type="button" title="Check-out" aria-label="Check-out" disabled>↩</button>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" title="Annulée" aria-label="Annulée" disabled>✖</button>
+                                @endif
+                            </div>
+
+                            <div class="rv-status mt-2">
+                                <span class="badge text-bg-{{ $reservation->trashed() ? 'secondary' : ($reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info')) }}">
+                                    {{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}
+                                </span>
+                                <span class="badge text-bg-{{ $derivedPaymentStatus === 'paid' ? 'success' : ($derivedPaymentStatus === 'partial' ? 'warning' : 'danger') }}">
+                                    {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$derivedPaymentStatus] }}
+                                </span>
+                            </div>
                         </div>
 
                         <div class="modal fade" id="downloadInvoiceModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
@@ -532,7 +557,7 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="11">
+                    <td colspan="10">
                         <div class="gh-empty my-2">Aucune réservation trouvée pour les filtres sélectionnés.</div>
                     </td>
                 </tr>
