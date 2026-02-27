@@ -116,4 +116,45 @@ class ReservationStatusTest extends TestCase
             'status' => 'reserved',
         ]);
     }
+
+    public function test_checkout_releases_room_even_if_expected_checkout_date_not_reached(): void
+    {
+        $user = $this->prepareEnvironment();
+        $hotel = $user->currentHotel();
+        $room = Room::first();
+        $client = Client::create([
+            'name' => 'Sample',
+            'hotel_id' => $hotel?->id,
+        ]);
+
+        $createResponse = $this->actingAs($user)
+            ->post(route('reservations.store'), [
+                'client_id' => $client->id,
+                'room_id' => $room->id,
+                'checkin_date' => Carbon::today()->toDateString(),
+                'expected_checkout_date' => Carbon::today()->addDays(5)->toDateString(),
+            ]);
+
+        $createResponse->assertRedirect(route('reservations.index'));
+
+        $reservation = Reservation::query()->latest('id')->firstOrFail();
+
+        $checkoutResponse = $this->actingAs($user)
+            ->put(route('reservations.update', $reservation), [
+                'action' => 'checkout',
+            ]);
+
+        $checkoutResponse->assertRedirect();
+
+        $this->assertDatabaseHas('reservations', [
+            'id' => $reservation->id,
+            'status' => 'checked_out',
+            'actual_checkout_date' => Carbon::today()->toDateString(),
+        ]);
+
+        $this->assertDatabaseHas('rooms', [
+            'id' => $room->id,
+            'status' => 'available',
+        ]);
+    }
 }

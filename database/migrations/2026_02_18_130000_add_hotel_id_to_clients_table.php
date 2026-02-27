@@ -16,17 +16,31 @@ return new class extends Migration
             $table->foreignId('hotel_id')->nullable()->after('id')->constrained('hotels')->nullOnDelete();
         });
 
-        DB::statement(<<<'SQL'
-            UPDATE clients c
-            SET c.hotel_id = (
-                SELECT MIN(a.hotel_id)
-                FROM reservations r
-                INNER JOIN rooms ro ON ro.id = r.room_id
-                INNER JOIN apartments a ON a.id = ro.apartment_id
-                WHERE r.client_id = c.id
-            )
-            WHERE c.hotel_id IS NULL
-        SQL);
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(<<<'SQL'
+                UPDATE clients
+                SET hotel_id = (
+                    SELECT MIN(apartments.hotel_id)
+                    FROM reservations
+                    INNER JOIN rooms ON rooms.id = reservations.room_id
+                    INNER JOIN apartments ON apartments.id = rooms.apartment_id
+                    WHERE reservations.client_id = clients.id
+                )
+                WHERE hotel_id IS NULL
+            SQL);
+        } else {
+            DB::statement(<<<'SQL'
+                UPDATE clients c
+                SET c.hotel_id = (
+                    SELECT MIN(a.hotel_id)
+                    FROM reservations r
+                    INNER JOIN rooms ro ON ro.id = r.room_id
+                    INNER JOIN apartments a ON a.id = ro.apartment_id
+                    WHERE r.client_id = c.id
+                )
+                WHERE c.hotel_id IS NULL
+            SQL);
+        }
     }
 
     /**

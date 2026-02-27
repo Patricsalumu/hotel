@@ -24,12 +24,24 @@ return new class extends Migration
             'id_user' => DB::raw('manager_id'),
         ]);
 
-        DB::table('payments as p')
-            ->join('reservations as r', 'r.id', '=', 'p.reservation_id')
-            ->whereNull('p.id_user')
-            ->update([
-                'p.id_user' => DB::raw('r.manager_id'),
-            ]);
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(<<<'SQL'
+                UPDATE payments
+                SET id_user = (
+                    SELECT reservations.manager_id
+                    FROM reservations
+                    WHERE reservations.id = payments.reservation_id
+                )
+                WHERE id_user IS NULL
+            SQL);
+        } else {
+            DB::table('payments as p')
+                ->join('reservations as r', 'r.id', '=', 'p.reservation_id')
+                ->whereNull('p.id_user')
+                ->update([
+                    'p.id_user' => DB::raw('r.manager_id'),
+                ]);
+        }
     }
 
     /**

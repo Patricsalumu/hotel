@@ -1,14 +1,54 @@
 <x-app-layout>
+    @php
+        $canCheckin = $reservation->status === 'reserved' && ! $reservation->trashed();
+        $canCheckout = ! $reservation->trashed();
+    @endphp
     <x-slot name="header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h4 class="mb-1">Détails réservation {{ $reservation->reference }}</h4>
                 <div class="small text-white-50">Informations séjour et encaissement</div>
             </div>
-            <div class="d-flex gap-2">
-                <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}" class="btn btn-sm btn-outline-light">Télécharger A4</a>
-                <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}" class="btn btn-sm btn-outline-light">Télécharger 80mm</a>
-                <a href="{{ $whatsAppInvoiceUrl ?? '#' }}" target="_blank" class="btn btn-sm btn-outline-light">WhatsApp client</a>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}" class="btn btn-sm btn-outline-light">Télécharger A4</a>
+                    <a href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}" class="btn btn-sm btn-outline-light">Télécharger 80mm</a>
+                    <a href="{{ $whatsAppInvoiceUrl ?? '#' }}" target="_blank" class="btn btn-sm btn-outline-light">WhatsApp client</a>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-center border-start border-light ps-3">
+                    @if($canCheckin)
+                        <form method="POST" action="{{ route('reservations.update', $reservation) }}" class="m-0">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="action" value="checkin">
+                            <button class="btn btn-sm btn-outline-success" type="submit" aria-label="Check-in">Check-in</button>
+                        </form>
+                    @else
+                        <button class="btn btn-sm btn-outline-success" type="button" disabled>Check-in</button>
+                    @endif
+
+                    @if($canCheckout)
+                        <form method="POST" action="{{ route('reservations.update', $reservation) }}" class="m-0">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="action" value="checkout">
+                            <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Check-out">Check-out</button>
+                        </form>
+                    @else
+                        <button class="btn btn-sm btn-outline-danger" type="button" disabled>Check-out</button>
+                    @endif
+
+                    @if(! $reservation->trashed())
+                        <form method="POST" action="{{ route('reservations.update', $reservation) }}" onsubmit="return confirm('Annuler cette réservation ?')" class="m-0">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="action" value="cancel">
+                            <button class="btn btn-sm btn-outline-secondary" type="submit" aria-label="Annuler">Annuler</button>
+                        </form>
+                    @else
+                        <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Annulée</button>
+                    @endif
+                </div>
                 <a href="{{ route('reservations.index') }}" class="btn btn-sm btn-light">Retour aux réservations</a>
             </div>
         </div>

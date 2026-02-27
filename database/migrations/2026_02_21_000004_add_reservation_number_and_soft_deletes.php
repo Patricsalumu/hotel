@@ -18,10 +18,23 @@ return new class extends Migration
             $table->softDeletes();
         });
 
-        DB::table('reservations')
-            ->join('rooms', 'rooms.id', '=', 'reservations.room_id')
-            ->join('apartments', 'apartments.id', '=', 'rooms.apartment_id')
-            ->update(['reservations.hotel_id' => DB::raw('apartments.hotel_id')]);
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement(<<<'SQL'
+                UPDATE reservations
+                SET hotel_id = (
+                    SELECT apartments.hotel_id
+                    FROM rooms
+                    INNER JOIN apartments ON apartments.id = rooms.apartment_id
+                    WHERE rooms.id = reservations.room_id
+                )
+                WHERE hotel_id IS NULL
+            SQL);
+        } else {
+            DB::table('reservations')
+                ->join('rooms', 'rooms.id', '=', 'reservations.room_id')
+                ->join('apartments', 'apartments.id', '=', 'rooms.apartment_id')
+                ->update(['reservations.hotel_id' => DB::raw('apartments.hotel_id')]);
+        }
 
         $rows = DB::table('reservations')
             ->select('id', 'hotel_id')

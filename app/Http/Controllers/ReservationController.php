@@ -277,7 +277,7 @@ class ReservationController extends Controller
             $reservation->delete();
             $reservation->room->update(['status' => 'available']);
 
-            return back()->with('success', 'Réservation annulée avec succès.');
+            return redirect()->route('reservations.index')->with('success', 'Réservation annulée avec succès.');
         }
 
         if ($action === 'checkin') {
