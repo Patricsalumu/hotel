@@ -245,14 +245,14 @@
             return max(0, $gross - $discount);
         });
         $pagePaidAmount = $activeReservations->sum(fn ($reservation) => $reservation->payments->sum('amount'));
-        $pageRemainingAmount = max(0, $pageTotalAmount - $pagePaidAmount);
+        $pageSolde = $pageTotalAmount - $pagePaidAmount;
     @endphp
 
     <div class="row g-2 mb-3">
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Réservations (page)</div><div class="rv-kpi-value">{{ $activeReservations->count() }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Montant total</div><div class="rv-kpi-value">{{ \App\Support\Money::format($pageTotalAmount, $currency) }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Total payé</div><div class="rv-kpi-value text-success">{{ \App\Support\Money::format($pagePaidAmount, $currency) }}</div></div></div>
-        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Reste à payer</div><div class="rv-kpi-value text-danger">{{ \App\Support\Money::format($pageRemainingAmount, $currency) }}</div></div></div>
+        <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Solde</div><div class="rv-kpi-value {{ $pageSolde > 0 ? 'text-danger' : ($pageSolde < 0 ? 'text-success' : '') }}">{{ \App\Support\Money::format($pageSolde, $currency) }}</div></div></div>
     </div>
 
     <div class="gh-card card mb-3">
@@ -406,7 +406,7 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 rv-table">
-            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Suivi</th></tr></thead>
+            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Solde</th><th>Suivi</th></tr></thead>
             <tbody>
             @forelse($reservations as $reservation)
                 @php
@@ -415,7 +415,7 @@
                     $discount = (float) ($reservation->discount_amount ?? 0);
                     $netTotal = max(0, $gross - $discount);
                     $paid = $reservation->payments->sum('amount');
-                    $remaining = max(0, $netTotal - $paid);
+                    $solde = $netTotal - $paid;
                     $derivedPaymentStatus = $paid <= 0 ? 'unpaid' : ($paid >= $netTotal ? 'paid' : 'partial');
                     $clientPhone = preg_replace('/\D+/', '', (string) $reservation->client->phone);
                     $publicInvoiceA4 = \Illuminate\Support\Facades\URL::temporarySignedRoute('reservations.public.invoice.pdf', now()->addDays(7), ['reservation' => $reservation->id, 'paper' => 'a4']);
@@ -427,7 +427,7 @@
                     $waText .= "Reduction: " . \App\Support\Money::format($discount, $currency) . "\n";
                     $waText .= "Net a payer: " . \App\Support\Money::format($netTotal, $currency) . "\n";
                     $waText .= "Paye: " . \App\Support\Money::format($paid, $currency) . "\n";
-                    $waText .= "Reste: " . \App\Support\Money::format($remaining, $currency) . "\n";
+                    $waText .= "Solde: " . \App\Support\Money::format($solde, $currency) . "\n";
                     $waText .= "Facture A4: {$publicInvoiceA4}";
                     $waUrl = $clientPhone
                         ? 'https://wa.me/' . $clientPhone . '?text=' . urlencode($waText)
@@ -450,12 +450,17 @@
                     <td><span class="fw-semibold">{{ \App\Support\Money::format($netTotal, $currency) }}</span></td>
                     <td><span class="text-success fw-semibold">{{ \App\Support\Money::format($paid, $currency) }}</span></td>
                     <td>
+                        <span class="fw-semibold {{ $solde > 0 ? 'text-danger' : ($solde < 0 ? 'text-success' : 'text-muted') }}">
+                            {{ \App\Support\Money::format($solde, $currency) }}
+                        </span>
+                    </td>
+                    <td>
                         <div class="rv-inline-tools">
                             <div class="rv-action-row">
                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal"
                                         data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
 
-                                @if($remaining > 0 && !$reservation->trashed())
+                                @if(!$reservation->trashed())
                                     <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal"
                                             data-bs-target="#paymentModal{{ $reservation->id }}" title="Payer" aria-label="Payer">💳</button>
                                 @else
@@ -518,7 +523,7 @@
                             </div>
                         </div>
 
-                        @if($remaining > 0 && !$reservation->trashed())
+                        @if(!$reservation->trashed())
                             <div class="modal fade" id="paymentModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
                                 <div class="modal-dialog">
                                     <div class="modal-content">
@@ -532,7 +537,7 @@
                                             <div class="modal-body">
                                                 <div class="mb-2">
                                                     <label class="form-label">Montant</label>
-                                                    <input type="number" step="0.01" min="0.01" class="form-control" name="amount" value="{{ number_format($remaining, 2, '.', '') }}" required>
+                                                    <input type="number" step="0.01" min="0.01" class="form-control" name="amount" value="{{ number_format(max(0, $solde), 2, '.', '') }}" required>
                                                 </div>
                                                 <div class="mb-2">
                                                     <label class="form-label">Mode de paiement</label>

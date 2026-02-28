@@ -94,4 +94,28 @@ class ClientController extends Controller
 
         return view('clients.show', compact('client'));
     }
+
+    public function edit(Client $client)
+    {
+        $this->authorize('update', $client);
+        $hotel = auth()->user()->currentHotel();
+        if ($client->hotel_id !== $hotel?->id) {
+            abort(403);
+        }
+
+        return view('clients.edit', compact('client'));
+    }
+
+    public function update(StoreClientRequest $request, Client $client)
+    {
+        $this->authorize('update', $client);
+        $hotel = $request->user()->currentHotel();
+        if ($client->hotel_id !== $hotel?->id) {
+            abort(403);
+        }
+
+        $client->update($request->validated());
+
+        return redirect()->route('clients.index')->with('success', 'Client mis à jour avec succès.');
+    }
 }

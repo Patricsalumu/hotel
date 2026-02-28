@@ -31,15 +31,12 @@ class PaymentController extends Controller
             $reservation->refresh();
         }
 
-        $alreadyPaid = (float) $reservation->payments()->sum('amount');
-        $remaining = max(0, (float) $reservation->total_amount - $alreadyPaid);
         $requestedAmount = (float) $request->input('amount');
-        $amount = $remaining > 0 ? min($requestedAmount, $remaining) : $requestedAmount;
 
         Payment::create([
             'reservation_id' => $reservation->id,
             'id_user' => $request->user()->id,
-            'amount' => $amount,
+            'amount' => $requestedAmount,
             'payment_method' => $request->string('payment_method')->toString(),
             'created_at' => now(),
         ]);

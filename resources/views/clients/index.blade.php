@@ -74,7 +74,7 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 cl-table">
-            <thead class="table-light"><tr><th>Nom</th><th>Téléphone</th><th>Email</th><th>Réservations</th><th></th></tr></thead>
+            <thead class="table-light"><tr><th>Nom</th><th>Téléphone</th><th>Email</th><th>Réservations</th><th>Actions</th></tr></thead>
             <tbody>
                 @forelse($clients as $client)
                 <tr>
@@ -82,7 +82,12 @@
                     <td>{{ $client->phone }}</td>
                     <td>{{ $client->email }}</td>
                     <td><span class="badge text-bg-light border">{{ $client->reservations->count() }}</span></td>
-                    <td><a class="btn btn-sm btn-outline-primary" href="{{ route('clients.show',$client) }}">Voir</a></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <a class="btn btn-sm btn-outline-primary" href="{{ route('clients.show',$client) }}">Voir</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ route('clients.edit',$client) }}">Modifier</a>
+                        </div>
+                    </td>
                 </tr>
                 @empty
                 <tr>
