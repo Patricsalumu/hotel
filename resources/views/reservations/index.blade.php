@@ -315,50 +315,70 @@
     <div id="tableView">
 
     <div class="modal fade" id="createReservationModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <form method="POST" action="{{ route('reservations.store') }}">
                     @csrf
                     <input type="hidden" name="creation_source" value="reservations_index">
                     <div class="modal-header"><h5 class="modal-title">Nouvelle réservation</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                     <div class="modal-body">
-                        <div class="mb-2">
-                            <label class="form-label">Rechercher client</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="clientSearchInput" placeholder="Nom, téléphone, email">
-                                <button class="btn btn-outline-secondary" type="button" id="clientSearchBtn">Rechercher</button>
+                        <div class="row g-3">
+                            <div class="col-lg-6">
+                                <label class="form-label">Rechercher client</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="clientSearchInput" placeholder="Nom, téléphone, email">
+                                    <button class="btn btn-outline-secondary" type="button" id="clientSearchBtn">Rechercher</button>
+                                </div>
+                                <div class="small text-muted mt-1" id="clientSearchFeedback"></div>
                             </div>
-                            <div class="small text-muted mt-1" id="clientSearchFeedback"></div>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Client</label>
-                            <select class="form-select" name="client_id" id="reservationClientSelect" required>
-                                <option value="">Client</option>
-                                @foreach($clients as $client)<option value="{{ $client->id }}">{{ $client->name }}</option>@endforeach
-                            </select>
-                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="openCreateClientModalBtn" data-bs-toggle="modal" data-bs-target="#createClientQuickModal">Nouveau client</button>
-                        </div>
-                        <div class="mb-2">
-                            <label class="form-label">Chambre disponible</label>
-                            <select class="form-select" name="room_id" id="reservationRoomSelect" required>
-                                <option value="">Chambre disponible</option>
-                                @foreach($availableRooms as $room)
-                                    <option value="{{ $room->id }}" data-price="{{ (float) $room->price_per_night }}">{{ $room->number }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="row g-2">
-                            <div class="col-md-6"><label class="form-label">Date d’arrivée</label><input type="date" class="form-control" id="reservationCheckinDate" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
-                            <div class="col-md-6"><label class="form-label">Date prévue</label><input type="date" class="form-control" id="reservationCheckoutDate" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
-                        </div>
-                        <div class="mt-2">
-                            <label class="form-label">Réduction</label>
-                            <input type="number" step="0.01" min="0" class="form-control" id="reservationDiscountAmount" name="discount_amount" value="{{ old('discount_amount', 0) }}" placeholder="0">
-                        </div>
-                        <div class="mt-3 border rounded p-2 bg-light">
-                            <div class="d-flex justify-content-between"><span>Total à payer</span><strong id="reservationGrossAmount">0 {{ $currency }}</strong></div>
-                            <div class="d-flex justify-content-between"><span>Réduction</span><strong id="reservationDiscountPreview">0 {{ $currency }}</strong></div>
-                            <div class="d-flex justify-content-between"><span>Net à payer</span><strong id="reservationNetAmount">0 {{ $currency }}</strong></div>
+                            <div class="col-lg-6">
+                                <label class="form-label">Client</label>
+                                <select class="form-select" name="client_id" id="reservationClientSelect" required>
+                                    <option value="">Client</option>
+                                    @foreach($clients as $client)<option value="{{ $client->id }}">{{ $client->name }}</option>@endforeach
+                                </select>
+                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="openCreateClientModalBtn" data-bs-toggle="modal" data-bs-target="#createClientQuickModal">Nouveau client</button>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <label class="form-label">Chambre disponible</label>
+                                <select class="form-select" name="room_id" id="reservationRoomSelect" required>
+                                    <option value="">Sélectionner une chambre</option>
+                                    @foreach($bookableRooms as $room)
+                                        @php
+                                            $roomStatusLabel = [
+                                                'available' => 'libre',
+                                                'reserved' => 'réservée',
+                                                'occupied' => 'occupée',
+                                            ][$room->status] ?? $room->status;
+                                        @endphp
+                                        <option value="{{ $room->id }}" data-price="{{ (float) $room->price_per_night }}" data-status="{{ $room->status }}" data-base-label="{{ $room->number }} ({{ $roomStatusLabel }})">{{ $room->number }} ({{ $roomStatusLabel }})</option>
+                                    @endforeach
+                                </select>
+                                <div class="small text-muted mt-1">
+                                    Une chambre réservée/occupée peut être sélectionnée si les dates saisies respectent les règles de planification.
+                                </div>
+                                <div class="small mt-1 text-muted" id="roomCompatibilityFeedback"></div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="row g-2">
+                                    <div class="col-md-6"><label class="form-label">Date d’arrivée</label><input type="date" class="form-control" id="reservationCheckinDate" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
+                                    <div class="col-md-6"><label class="form-label">Date prévue</label><input type="date" class="form-control" id="reservationCheckoutDate" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
+                                </div>
+                                <div class="mt-2">
+                                    <label class="form-label">Réduction</label>
+                                    <input type="number" step="0.01" min="0" class="form-control" id="reservationDiscountAmount" name="discount_amount" value="{{ old('discount_amount', 0) }}" placeholder="0">
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div class="border rounded p-2 bg-light">
+                                    <div class="d-flex justify-content-between"><span>Total à payer</span><strong id="reservationGrossAmount">0 {{ $currency }}</strong></div>
+                                    <div class="d-flex justify-content-between"><span>Réduction</span><strong id="reservationDiscountPreview">0 {{ $currency }}</strong></div>
+                                    <div class="d-flex justify-content-between"><span>Net à payer</span><strong id="reservationNetAmount">0 {{ $currency }}</strong></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button><button class="btn gh-btn-primary btn-primary">Créer</button></div>
@@ -577,6 +597,7 @@
         // Calendar state
         let currentMonth = new Date();
         const reservations = @json($calendarReservations ?? []);
+        const roomPlanningReservations = @json($roomPlanningReservations ?? []);
 
         function renderCalendar() {
             const year = currentMonth.getFullYear();
@@ -685,6 +706,142 @@
         const grossPreview = document.getElementById('reservationGrossAmount');
         const discountPreview = document.getElementById('reservationDiscountPreview');
         const netPreview = document.getElementById('reservationNetAmount');
+        const roomCompatibilityFeedback = document.getElementById('roomCompatibilityFeedback');
+
+        const parseDateOnly = (value) => {
+            if (!value) return null;
+            const parsed = new Date(`${value}T00:00:00`);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        };
+
+        const evaluateRoomCompatibility = (roomId, roomStatus, newCheckinDate, newCheckoutDate) => {
+            if (!newCheckinDate) {
+                return { compatible: true, reason: '' };
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const roomReservations = roomPlanningReservations
+                .filter((reservation) => Number(reservation.room_id) === Number(roomId))
+                .map((reservation) => ({
+                    ...reservation,
+                    checkin: parseDateOnly(reservation.checkin),
+                    expected_checkout: parseDateOnly(reservation.expected_checkout),
+                }))
+                .filter((reservation) => reservation.checkin);
+
+            const occupiedLikeReservation = [...roomReservations]
+                .filter((reservation) => reservation.status === 'checked_in')
+                .sort((a, b) => b.checkin - a.checkin)[0]
+                || [...roomReservations]
+                    .filter((reservation) => reservation.status === 'reserved' && reservation.checkin <= today)
+                    .sort((a, b) => b.checkin - a.checkin)[0];
+
+            if (roomStatus === 'occupied') {
+                if (!occupiedLikeReservation) {
+                    return { compatible: false, reason: 'occupée actuellement' };
+                }
+
+                if (!occupiedLikeReservation.expected_checkout) {
+                    return { compatible: false, reason: 'occupation sans date de départ prévue' };
+                }
+
+                if (newCheckinDate < occupiedLikeReservation.expected_checkout) {
+                    return { compatible: false, reason: 'arrivée avant la fin prévue de l’occupation' };
+                }
+            }
+
+            const futureReservedDates = roomReservations
+                .filter((reservation) => reservation.status === 'reserved' && reservation.checkin > newCheckinDate)
+                .map((reservation) => reservation.checkin)
+                .sort((a, b) => a - b);
+
+            if (futureReservedDates.length > 0) {
+                const nearestReservedStart = futureReservedDates[0];
+                if (!newCheckoutDate) {
+                    return { compatible: false, reason: 'date prévue requise avant la prochaine réservation' };
+                }
+
+                if (newCheckoutDate >= nearestReservedStart) {
+                    return { compatible: false, reason: 'date prévue doit être avant la prochaine arrivée' };
+                }
+            }
+
+            const hasBlockingOverlap = roomReservations.some((reservation) => {
+                if (reservation.checkin > newCheckinDate) {
+                    return false;
+                }
+
+                if (reservation.status !== 'reserved' && reservation.status !== 'checked_in') {
+                    return false;
+                }
+
+                const reservationEnd = reservation.expected_checkout;
+                if (!reservationEnd) {
+                    return true;
+                }
+
+                if (occupiedLikeReservation && reservation.id === occupiedLikeReservation.id && newCheckinDate >= reservationEnd) {
+                    return false;
+                }
+
+                return newCheckinDate < reservationEnd;
+            });
+
+            if (hasBlockingOverlap) {
+                return { compatible: false, reason: 'chevauchement avec une réservation existante' };
+            }
+
+            return { compatible: true, reason: '' };
+        };
+
+        const refreshRoomCompatibility = () => {
+            if (!roomSelect) {
+                return;
+            }
+
+            const newCheckinDate = parseDateOnly(checkinInput?.value || '');
+            const newCheckoutDate = parseDateOnly(checkoutInput?.value || '');
+            const selectedValue = roomSelect.value;
+            let availableCount = 0;
+
+            [...roomSelect.options].forEach((option) => {
+                if (!option.value) {
+                    option.disabled = false;
+                    return;
+                }
+
+                const roomId = Number(option.value);
+                const roomStatus = option.dataset.status || 'available';
+                const baseLabel = option.dataset.baseLabel || option.textContent || '';
+                const result = evaluateRoomCompatibility(roomId, roomStatus, newCheckinDate, newCheckoutDate);
+
+                option.disabled = !result.compatible;
+                option.textContent = result.compatible ? baseLabel : `⛔ ${baseLabel}`;
+                option.title = result.reason || '';
+
+                if (result.compatible) {
+                    availableCount++;
+                }
+            });
+
+            if (selectedValue && roomSelect.selectedOptions[0]?.disabled) {
+                roomSelect.value = '';
+            }
+
+            if (roomCompatibilityFeedback) {
+                if (availableCount === 0) {
+                    roomCompatibilityFeedback.classList.remove('text-muted');
+                    roomCompatibilityFeedback.classList.add('text-danger');
+                    roomCompatibilityFeedback.textContent = 'Aucune chambre compatible pour les dates sélectionnées.';
+                } else {
+                    roomCompatibilityFeedback.classList.remove('text-danger');
+                    roomCompatibilityFeedback.classList.add('text-muted');
+                    roomCompatibilityFeedback.textContent = `${availableCount} chambre(s) compatible(s) pour ces dates.`;
+                }
+            }
+        };
 
         const computeReservationAmounts = () => {
             const selectedRoom = roomSelect?.selectedOptions?.[0];
@@ -711,6 +868,13 @@
             el?.addEventListener('change', computeReservationAmounts);
             el?.addEventListener('input', computeReservationAmounts);
         });
+
+        [checkinInput, checkoutInput].forEach((el) => {
+            el?.addEventListener('change', refreshRoomCompatibility);
+            el?.addEventListener('input', refreshRoomCompatibility);
+        });
+
+        refreshRoomCompatibility();
         computeReservationAmounts();
 
         const clientSearchInput = document.getElementById('clientSearchInput');

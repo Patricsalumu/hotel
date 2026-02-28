@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class ReservationController extends Controller
@@ -42,6 +43,10 @@ class ReservationController extends Controller
         $availableRooms = Room::where('status', 'available')
             ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
             ->orderBy('number')
+            ->get();
+
+        $bookableRooms = Room::whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+            ->orderBy('id')
             ->get();
 
         // build auxiliary data for sharing
@@ -94,6 +99,7 @@ class ReservationController extends Controller
         // prepare calendar-friendly reservations data to avoid Blade parsing issues
         $calendarReservations = $reservations->getCollection()->map(fn ($r) => [
             'id' => $r->id,
+            'room_id' => $r->room_id,
             'reference' => $r->reference,
             'room_number' => $r->room->number,
             'client_name' => $r->client->name,
@@ -103,10 +109,28 @@ class ReservationController extends Controller
             'is_cancelled' => $r->trashed(),
         ])->values()->toArray();
 
+        $roomPlanningReservations = Reservation::query()
+            ->select(['id', 'room_id', 'checkin_date', 'expected_checkout_date', 'status'])
+            ->where('hotel_id', $hotel->id)
+            ->whereNull('deleted_at')
+            ->whereIn('status', ['reserved', 'checked_in'])
+            ->orderBy('checkin_date')
+            ->get()
+            ->map(fn ($reservation) => [
+                'id' => $reservation->id,
+                'room_id' => $reservation->room_id,
+                'checkin' => $reservation->checkin_date?->format('Y-m-d'),
+                'expected_checkout' => $reservation->expected_checkout_date?->format('Y-m-d'),
+                'status' => $reservation->status,
+            ])
+            ->values()
+            ->toArray();
+
         return view('reservations.index', compact(
             'reservations',
             'clients',
             'availableRooms',
+            'bookableRooms',
             'hotel',
             'sharePageText',
             'sharePageMessage',
@@ -116,50 +140,54 @@ class ReservationController extends Controller
             'todayReceived',
             'todayExpenses',
             'balance',
-            'calendarReservations'
+            'calendarReservations',
+            'roomPlanningReservations'
         ));
     }
 
     public function store(StoreReservationRequest $request)
     {
         $hotel = $request->user()->currentHotel();
+        $checkinDate = Carbon::parse($request->date('checkin_date'))->startOfDay();
+        $expectedCheckoutDate = $request->date('expected_checkout_date')
+            ? Carbon::parse($request->date('expected_checkout_date'))->startOfDay()
+            : null;
+
         $room = Room::where('id', $request->integer('room_id'))
             ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
             ->firstOrFail();
 
-        if ($room->status === 'occupied') {
-            return back()->withErrors(['room_id' => 'Cette chambre est déjà occupée et ne peut pas être réservée.'])->withInput();
-        }
-
-        $expectedCheckoutDate = $request->date('expected_checkout_date')
-            ? Carbon::parse($request->date('expected_checkout_date'))->toDateString()
-            : null;
-
         // determine initial reservation status based on checkin date relative to today
-        $checkinDate = Carbon::parse($request->date('checkin_date'))->toDateString();
         $today = Carbon::today()->toDateString();
+        $checkinDateString = $checkinDate->toDateString();
 
-        if ($checkinDate === $today) {
+        if ($checkinDateString === $today && $room->status !== 'occupied') {
             // checkin happening today -> mark occupied
             $initialStatus = 'checked_in';
             $roomStatus = 'occupied';
         } else {
             // past or future check‑in should simply be reserved until the day arrives
             $initialStatus = 'reserved';
-            $roomStatus = 'reserved';
+            $roomStatus = $room->status === 'occupied' ? 'occupied' : 'reserved';
         }
 
         $client = Client::where('id', $request->integer('client_id'))
             ->where('hotel_id', $hotel->id)
             ->firstOrFail();
 
-        $reservation = DB::transaction(function () use ($hotel, $room, $request, $client, $expectedCheckoutDate, $initialStatus, $roomStatus) {
+        $reservation = DB::transaction(function () use ($hotel, $room, $request, $client, $expectedCheckoutDate, $checkinDate, $initialStatus, $roomStatus) {
             $lockedRoom = Room::whereKey($room->id)->lockForUpdate()->firstOrFail();
-            if ($lockedRoom->status === 'occupied') {
-                throw ValidationException::withMessages([
-                    'room_id' => 'Cette chambre est déjà occupée et ne peut pas être réservée.',
-                ]);
-            }
+
+            $activeReservations = Reservation::query()
+                ->where('room_id', $lockedRoom->id)
+                ->where('hotel_id', $hotel->id)
+                ->whereNull('deleted_at')
+                ->whereIn('status', ['reserved', 'checked_in'])
+                ->orderBy('checkin_date')
+                ->lockForUpdate()
+                ->get();
+
+            $this->assertRoomCanBeScheduled($lockedRoom, $activeReservations, $checkinDate, $expectedCheckoutDate);
 
             $nextReservationNumber = (int) Reservation::withTrashed()
                 ->where('hotel_id', $hotel->id)
@@ -173,8 +201,8 @@ class ReservationController extends Controller
                 'reservation_number' => $nextReservationNumber,
                 'manager_id' => $request->user()->id,
                 'id_user' => $request->user()->id,
-                'checkin_date' => $request->date('checkin_date'),
-                'expected_checkout_date' => $expectedCheckoutDate,
+                'checkin_date' => $checkinDate->toDateString(),
+                'expected_checkout_date' => $expectedCheckoutDate?->toDateString(),
                 'status' => $initialStatus,
                 'payment_status' => 'unpaid',
                 'total_amount' => 0,
@@ -226,6 +254,104 @@ class ReservationController extends Controller
         return redirect()
             ->route('reservations.index')
             ->with('success', $successMessage);
+    }
+
+    private function assertRoomCanBeScheduled(Room $room, Collection $activeReservations, Carbon $newCheckin, ?Carbon $newExpectedCheckout): void
+    {
+        $today = Carbon::today()->startOfDay();
+
+        $occupiedReservation = $activeReservations
+            ->filter(fn (Reservation $reservation) => $reservation->status === 'checked_in')
+            ->sortByDesc(fn (Reservation $reservation) => $reservation->checkin_date?->timestamp ?? 0)
+            ->first();
+
+        if (! $occupiedReservation) {
+            $occupiedReservation = $activeReservations
+                ->filter(function (Reservation $reservation) use ($today): bool {
+                    if ($reservation->status !== 'reserved' || ! $reservation->checkin_date) {
+                        return false;
+                    }
+
+                    return $reservation->checkin_date->copy()->startOfDay()->lte($today);
+                })
+                ->sortByDesc(fn (Reservation $reservation) => $reservation->checkin_date?->timestamp ?? 0)
+                ->first();
+        }
+
+        if ($room->status === 'occupied') {
+            if (! $occupiedReservation) {
+                throw ValidationException::withMessages([
+                    'room_id' => 'Cette chambre est occupée et ne peut pas être planifiée pour le moment.',
+                ]);
+            }
+
+            if (! $occupiedReservation->expected_checkout_date) {
+                throw ValidationException::withMessages([
+                    'room_id' => 'Cette chambre est occupée. Indiquez d\'abord une date de départ prévue sur l\'occupation en cours.',
+                ]);
+            }
+
+            $occupiedExpectedCheckout = $occupiedReservation->expected_checkout_date->copy()->startOfDay();
+            if ($newCheckin->lt($occupiedExpectedCheckout)) {
+                throw ValidationException::withMessages([
+                    'checkin_date' => 'La nouvelle réservation doit commencer à partir de la date de départ prévue de l\'occupation en cours.',
+                ]);
+            }
+        }
+
+        $futureReservedStarts = $activeReservations
+            ->filter(fn (Reservation $reservation) => $reservation->status === 'reserved' && $reservation->checkin_date)
+            ->map(fn (Reservation $reservation) => $reservation->checkin_date->copy()->startOfDay())
+            ->filter(fn (Carbon $checkinDate) => $checkinDate->gt($newCheckin));
+
+        if ($futureReservedStarts->isNotEmpty()) {
+            $nearestStart = $futureReservedStarts->sort()->first();
+            if (! $newExpectedCheckout) {
+                throw ValidationException::withMessages([
+                    'expected_checkout_date' => 'La date prévue de sortie est obligatoire pour réserver avant une réservation déjà planifiée.',
+                ]);
+            }
+
+            if ($newExpectedCheckout->gte($nearestStart)) {
+                throw ValidationException::withMessages([
+                    'expected_checkout_date' => 'La date prévue de sortie doit être strictement inférieure à la prochaine date d\'arrivée déjà réservée.',
+                ]);
+            }
+        }
+
+        $blockingReservation = $activeReservations->first(function (Reservation $reservation) use ($newCheckin, $occupiedReservation): bool {
+            if (! $reservation->checkin_date) {
+                return false;
+            }
+
+            $start = $reservation->checkin_date->copy()->startOfDay();
+            if ($start->gt($newCheckin)) {
+                return false;
+            }
+
+            if ($reservation->status === 'checked_in') {
+                $end = $reservation->expected_checkout_date?->copy()->startOfDay();
+
+                if ($occupiedReservation && $reservation->id === $occupiedReservation->id && $end && $newCheckin->gte($end)) {
+                    return false;
+                }
+
+                return ! $end || $newCheckin->lt($end);
+            }
+
+            if ($reservation->status === 'reserved') {
+                $end = $reservation->expected_checkout_date?->copy()->startOfDay();
+                return ! $end || $newCheckin->lt($end);
+            }
+
+            return false;
+        });
+
+        if ($blockingReservation) {
+            throw ValidationException::withMessages([
+                'checkin_date' => 'Cette date d\'arrivée chevauche une réservation/occupation existante pour cette chambre.',
+            ]);
+        }
     }
 
     public function show(Reservation $reservation)

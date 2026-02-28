@@ -104,7 +104,7 @@
         </div>
 
         <div class="modal fade" id="reservationModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <form method="POST" action="{{ route('reservations.store') }}">
                         @csrf
@@ -116,20 +116,22 @@
                         <div class="modal-body">
                             <input type="hidden" name="room_id" id="modalRoomId">
                             <input type="hidden" id="modalRoomPrice" value="0">
-                            <div class="mb-2">
-                                <label class="form-label">Rechercher client</label>
-                                <input type="text" class="form-control" id="dashboardClientSearchInput" placeholder="Tapez une lettre...">
-                                <div class="small text-muted mt-1" id="dashboardClientSearchFeedback"></div>
-                            </div>
-                            <div class="mb-2">
-                                <label class="form-label">Client</label>
-                                <select class="form-select" name="client_id" id="dashboardClientSelect" required>
-                                    <option value="">Sélectionner</option>
-                                    @foreach($clients as $client)
-                                        <option value="{{ $client->id }}">{{ $client->name }}</option>
-                                    @endforeach
-                                </select>
-                                <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="dashboardOpenCreateClientBtn" data-bs-toggle="modal" data-bs-target="#dashboardCreateClientQuickModal">Nouveau client</button>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label">Rechercher client</label>
+                                    <input type="text" class="form-control" id="dashboardClientSearchInput" placeholder="Tapez une lettre...">
+                                    <div class="small text-muted mt-1" id="dashboardClientSearchFeedback"></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Client</label>
+                                    <select class="form-select" name="client_id" id="dashboardClientSelect" required>
+                                        <option value="">Sélectionner</option>
+                                        @foreach($clients as $client)
+                                            <option value="{{ $client->id }}">{{ $client->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="dashboardOpenCreateClientBtn" data-bs-toggle="modal" data-bs-target="#dashboardCreateClientQuickModal">Nouveau client</button>
+                                </div>
                             </div>
                             <div class="row g-2">
                                 <div class="col-md-6"><label class="form-label">Checkin</label><input type="date" class="form-control" id="dashboardCheckinDate" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
