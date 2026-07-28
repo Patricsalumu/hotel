@@ -25,11 +25,13 @@ class Reservation extends Model
 
     protected $fillable = [
         'client_id',
+        'apartment_id',
         'room_id',
         'hotel_id',
         'reservation_number',
         'manager_id',
         'id_user',
+        'expected_checkin_date',
         'checkin_date',
         'expected_checkout_date',
         'actual_checkout_date',
@@ -40,18 +42,24 @@ class Reservation extends Model
     ];
 
     protected $casts = [
+        'expected_checkin_date' => 'date',
         'checkin_date' => 'date',
         'expected_checkout_date' => 'date',
         'actual_checkout_date' => 'date',
         'total_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'reservation_number' => 'integer',
+        'reservation_number' => 'string',
         'deleted_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function apartment(): BelongsTo
+    {
+        return $this->belongsTo(Apartment::class);
     }
 
     public function room(): BelongsTo
@@ -91,7 +99,7 @@ class Reservation extends Model
 
     public function computeNights(Carbon $now, string $checkoutTime): int
     {
-        $start = Carbon::parse($this->checkin_date)->startOfDay();
+        $start = Carbon::parse($this->checkin_date ?? $this->expected_checkin_date)->startOfDay();
         $usingCurrentDate = false;
 
         if ($this->actual_checkout_date) {

@@ -25,8 +25,6 @@ class StoreRoomRequest extends FormRequest
         return [
             'apartment_id' => ['required', 'exists:apartments,id'],
             'number' => ['required', 'string', 'max:50'],
-            'type' => ['required', Rule::in(['simple', 'double', 'suite'])],
-            'price_per_night' => ['required', 'numeric', 'min:0.01'],
             'dimension' => ['nullable', 'string', 'max:50'],
             'dimension_width' => ['nullable', 'integer', 'min:60', 'max:500'],
             'dimension_height' => ['nullable', 'integer', 'min:40', 'max:300'],

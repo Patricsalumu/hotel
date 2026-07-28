@@ -14,7 +14,11 @@ class Apartment extends Model
     protected $fillable = [
         'hotel_id',
         'name',
-        'floor_number',
+        'price_per_night',
+    ];
+
+    protected $casts = [
+        'price_per_night' => 'decimal:2',
     ];
 
     public function hotel(): BelongsTo
@@ -25,5 +29,10 @@ class Apartment extends Model
     public function rooms(): HasMany
     {
         return $this->hasMany(Room::class);
+    }
+
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class);
     }
 }

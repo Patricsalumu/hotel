@@ -28,10 +28,11 @@ class StoreReservationRequest extends FormRequest
 
         return [
             'client_id' => ['required', Rule::exists('clients', 'id')->where(fn ($query) => $query->where('hotel_id', $hotelId))],
-            'room_id' => ['required', 'exists:rooms,id'],
-            // checkin may be in the past or future; logic in controller will decide
-            'checkin_date' => ['required', 'date'],
-            'expected_checkout_date' => ['nullable', 'date', 'after_or_equal:checkin_date'],
+            'apartment_id' => ['required', Rule::exists('apartments', 'id')->where(fn ($query) => $query->where('hotel_id', $hotelId))],
+            'room_id' => ['nullable', Rule::exists('rooms', 'id')->where(fn ($query) => $query->whereHas('apartment', fn ($query) => $query->where('hotel_id', $hotelId)))],
+            'expected_checkin_date' => ['required', 'date'],
+            'checkin_date' => ['nullable', 'date'],
+            'expected_checkout_date' => ['nullable', 'date', 'after_or_equal:expected_checkin_date'],
             'status' => ['nullable', Rule::in(['reserved', 'checked_in'])],
             'discount_amount' => ['nullable', 'numeric', 'min:0'],
             'creation_source' => ['nullable', Rule::in(['reservations_index', 'dashboard_shortcut'])],

@@ -94,7 +94,7 @@
                                     <div class="small text-muted">{{ $latest->client->name ?? '-' }} • {{ $nights }} nuitée(s)</div>
                                     <a href="{{ route('reservations.show', $latest) }}" class="btn btn-sm btn-outline-primary mt-2">Voir réservation</a>
                                 @elseif($room->status === 'available')
-                                    <button class="btn btn-sm gh-btn-primary btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#reservationModal" data-room-id="{{ $room->id }}" data-room-number="{{ $room->number }}" data-room-price="{{ (float) $room->price_per_night }}">Créer réservation</button>
+                                    <button class="btn btn-sm gh-btn-primary btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#reservationModal" data-apartment-id="{{ $room->apartment_id }}" data-apartment-name="{{ $room->apartment->name }}" data-apartment-price="{{ (float) $room->apartment->price_per_night }}">Créer réservation</button>
                                 @endif
                             </div>
                         </div>
@@ -110,12 +110,12 @@
                         @csrf
                         <input type="hidden" name="creation_source" value="dashboard_shortcut">
                         <div class="modal-header">
-                            <h5 class="modal-title">Nouvelle réservation <span class="badge text-bg-info ms-1">Raccourci dashboard</span> <span id="roomLabel" class="text-muted"></span></h5>
+                            <h5 class="modal-title">Nouvelle réservation <span class="badge text-bg-info ms-1">Raccourci dashboard</span> <span id="apartmentLabel" class="text-muted"></span></h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
-                            <input type="hidden" name="room_id" id="modalRoomId">
-                            <input type="hidden" id="modalRoomPrice" value="0">
+                            <input type="hidden" name="apartment_id" id="modalApartmentId">
+                            <input type="hidden" id="modalApartmentPrice" value="0">
                             <div class="row g-2">
                                 <div class="col-md-6">
                                     <label class="form-label">Rechercher client</label>
@@ -134,7 +134,7 @@
                                 </div>
                             </div>
                             <div class="row g-2">
-                                <div class="col-md-6"><label class="form-label">Checkin</label><input type="date" class="form-control" id="dashboardCheckinDate" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
+                                <div class="col-md-6"><label class="form-label">Date entrée prévue</label><input type="date" class="form-control" id="dashboardExpectedCheckinDate" name="expected_checkin_date" value="{{ old('expected_checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
                                 <div class="col-md-6"><label class="form-label">Checkout prévu</label><input type="date" class="form-control" id="dashboardCheckoutDate" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
                             </div>
                             <div class="mt-2">
@@ -187,9 +187,9 @@
             const reservationModal = document.getElementById('reservationModal');
             reservationModal.addEventListener('show.bs.modal', event => {
                 const button = event.relatedTarget;
-                document.getElementById('modalRoomId').value = button.getAttribute('data-room-id');
-                document.getElementById('modalRoomPrice').value = button.getAttribute('data-room-price') || '0';
-                document.getElementById('roomLabel').textContent = `(#${button.getAttribute('data-room-number')})`;
+                document.getElementById('modalApartmentId').value = button.getAttribute('data-apartment-id');
+                document.getElementById('modalApartmentPrice').value = button.getAttribute('data-apartment-price') || '0';
+                document.getElementById('apartmentLabel').textContent = button.getAttribute('data-apartment-name') ? `(${button.getAttribute('data-apartment-name')})` : '';
                 computeDashboardAmounts();
             });
 
@@ -199,13 +199,14 @@
             const dashboardCreateClientModalEl = document.getElementById('dashboardCreateClientQuickModal');
             const dashboardClientCreateForm = document.getElementById('dashboardCreateClientQuickForm');
             const dashboardClientCreateFeedback = document.getElementById('dashboardClientCreateFeedback');
-            const dashboardCheckinDate = document.getElementById('dashboardCheckinDate');
+            const dashboardCheckinDate = document.getElementById('dashboardExpectedCheckinDate');
             const dashboardCheckoutDate = document.getElementById('dashboardCheckoutDate');
             const dashboardDiscountAmount = document.getElementById('dashboardDiscountAmount');
             const dashboardNightsCount = document.getElementById('dashboardNightsCount');
             const dashboardGrossAmount = document.getElementById('dashboardGrossAmount');
             const dashboardDiscountPreview = document.getElementById('dashboardDiscountPreview');
             const dashboardNetAmount = document.getElementById('dashboardNetAmount');
+            const dashboardApartmentPrice = document.getElementById('modalApartmentPrice');
 
             const dashboardClients = [...(dashboardClientSelect?.options || [])]
                 .filter((option) => option.value)
@@ -217,7 +218,7 @@
             };
 
             const computeDashboardAmounts = () => {
-                const nightly = Number(document.getElementById('modalRoomPrice')?.value || 0);
+                const nightly = Number(dashboardApartmentPrice?.value || 0);
                 const checkinDate = dashboardCheckinDate?.value ? new Date(dashboardCheckinDate.value) : null;
                 const checkoutDate = dashboardCheckoutDate?.value ? new Date(dashboardCheckoutDate.value) : null;
                 let nights = 1;

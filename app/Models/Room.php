@@ -14,18 +14,8 @@ class Room extends Model
     protected $fillable = [
         'apartment_id',
         'number',
-        'type',
-        'price_per_night',
-        'dimension',
-        'shape',
-        'position_x',
-        'position_y',
         'status',
         'order_index',
-    ];
-
-    protected $casts = [
-        'price_per_night' => 'decimal:2',
     ];
 
     public function apartment(): BelongsTo

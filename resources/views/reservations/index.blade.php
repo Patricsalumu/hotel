@@ -239,7 +239,7 @@
         $activeReservations = $reservations->filter(fn ($reservation) => ! $reservation->trashed());
         $pageTotalAmount = $activeReservations->sum(function ($reservation) use ($hotel) {
             $nights = $reservation->computeNights(now(), $hotel->checkout_time);
-            $gross = (float) $reservation->room->price_per_night * $nights;
+            $gross = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $nights;
             $discount = (float) ($reservation->discount_amount ?? 0);
 
             return max(0, $gross - $discount);
@@ -341,29 +341,21 @@
                             </div>
 
                             <div class="col-lg-6">
-                                <label class="form-label">Chambre disponible</label>
-                                <select class="form-select" name="room_id" id="reservationRoomSelect" required>
-                                    <option value="">Sélectionner une chambre</option>
-                                    @foreach($bookableRooms as $room)
-                                        @php
-                                            $roomStatusLabel = [
-                                                'available' => 'libre',
-                                                'reserved' => 'réservée',
-                                                'occupied' => 'occupée',
-                                            ][$room->status] ?? $room->status;
-                                        @endphp
-                                        <option value="{{ $room->id }}" data-price="{{ (float) $room->price_per_night }}" data-status="{{ $room->status }}" data-base-label="{{ $room->number }} ({{ $roomStatusLabel }})">{{ $room->number }} ({{ $roomStatusLabel }})</option>
+                                <label class="form-label">Appartement</label>
+                                <select class="form-select" name="apartment_id" id="reservationApartmentSelect" required>
+                                    <option value="">Sélectionner un appartement</option>
+                                    @foreach($bookableApartments as $apartment)
+                                        <option value="{{ $apartment->id }}" data-price="{{ (float) $apartment->price_per_night }}">{{ $apartment->name }} - {{ \App\Support\Money::format($apartment->price_per_night, $currency) }}</option>
                                     @endforeach
                                 </select>
                                 <div class="small text-muted mt-1">
-                                    Une chambre réservée/occupée peut être sélectionnée si les dates saisies respectent les règles de planification.
+                                    La chambre sera assignée au check-in. Sélectionnez l’appartement souhaité pour la réservation.
                                 </div>
-                                <div class="small mt-1 text-muted" id="roomCompatibilityFeedback"></div>
                             </div>
 
                             <div class="col-lg-6">
                                 <div class="row g-2">
-                                    <div class="col-md-6"><label class="form-label">Date d’arrivée</label><input type="date" class="form-control" id="reservationCheckinDate" name="checkin_date" value="{{ old('checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
+                                    <div class="col-md-6"><label class="form-label">Date entrée prévue</label><input type="date" class="form-control" id="reservationExpectedCheckinDate" name="expected_checkin_date" value="{{ old('expected_checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
                                     <div class="col-md-6"><label class="form-label">Date prévue</label><input type="date" class="form-control" id="reservationCheckoutDate" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
                                 </div>
                                 <div class="mt-2">
@@ -374,6 +366,7 @@
 
                             <div class="col-12">
                                 <div class="border rounded p-2 bg-light">
+                                    <div class="d-flex justify-content-between"><span>Nuitées</span><strong id="reservationNightsCount">1</strong></div>
                                     <div class="d-flex justify-content-between"><span>Total à payer</span><strong id="reservationGrossAmount">0 {{ $currency }}</strong></div>
                                     <div class="d-flex justify-content-between"><span>Réduction</span><strong id="reservationDiscountPreview">0 {{ $currency }}</strong></div>
                                     <div class="d-flex justify-content-between"><span>Net à payer</span><strong id="reservationNetAmount">0 {{ $currency }}</strong></div>
@@ -426,12 +419,12 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 rv-table">
-            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Date d’arrivée</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Solde</th><th>Suivi</th></tr></thead>
+            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Entrée prévue</th><th>Entrée réelle</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Solde</th><th>Suivi</th></tr></thead>
             <tbody>
             @forelse($reservations as $reservation)
                 @php
                     $nights = $reservation->computeNights(now(), $hotel->checkout_time);
-                    $gross = (float) $reservation->room->price_per_night * $nights;
+                    $gross = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $nights;
                     $discount = (float) ($reservation->discount_amount ?? 0);
                     $netTotal = max(0, $gross - $discount);
                     $paid = $reservation->payments->sum('amount');
@@ -441,7 +434,7 @@
                     $publicInvoiceA4 = \Illuminate\Support\Facades\URL::temporarySignedRoute('reservations.public.invoice.pdf', now()->addDays(7), ['reservation' => $reservation->id, 'paper' => 'a4']);
                     $waText = "Notification - {$hotel->name}\n";
                     $waText .= "Client: {$reservation->client->name}\n";
-                    $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - Chambre {$reservation->room->number}\n";
+                    $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - " . ($reservation->room?->number ? 'Chambre ' . $reservation->room->number : ($reservation->apartment?->name ?? 'Appartement')) . "\n";
                     $waText .= "Nuitees: {$nights}\n";
                     $waText .= "Total: " . \App\Support\Money::format($gross, $currency) . "\n";
                     $waText .= "Reduction: " . \App\Support\Money::format($discount, $currency) . "\n";
@@ -461,9 +454,10 @@
                             <a href="{{ route('reservations.show',$reservation) }}" class="fw-semibold">{{ $reservation->reference }}</a>
                         @endif
                     </td>
-                    <td>{{ $reservation->room->number }}</td>
+                    <td>{{ $reservation->room?->number ? 'Ch. ' . $reservation->room->number : ($reservation->apartment?->name ?? '-') }}</td>
                     <td class="rv-client">{{ $reservation->client->name }}</td>
-                    <td>{{ $reservation->checkin_date?->format('Y-m-d') }}</td>
+                    <td>{{ $reservation->expected_checkin_date?->format('Y-m-d') }}</td>
+                    <td>{{ $reservation->checkin_date?->format('Y-m-d') ?? '-' }}</td>
                     <td>{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $reservation->actual_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $nights }}</td>
@@ -551,7 +545,7 @@
                                             @csrf
                                             <input type="hidden" name="reservation_id" value="{{ $reservation->id }}">
                                             <div class="modal-header">
-                                                <h5 class="modal-title">Paiement – Chambre {{ $reservation->room->number }}</h5>
+                                                <h5 class="modal-title">Paiement – {{ $reservation->room?->number ? 'Chambre ' . $reservation->room->number : ($reservation->apartment?->name ?? 'Réservation') }}</h5>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                             </div>
                                             <div class="modal-body">
@@ -699,14 +693,14 @@
             return `${numeric.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {{ $currency }}`;
         };
 
-        const roomSelect = document.getElementById('reservationRoomSelect');
-        const checkinInput = document.getElementById('reservationCheckinDate');
+        const apartmentSelect = document.getElementById('reservationApartmentSelect');
+        const checkinInput = document.getElementById('reservationExpectedCheckinDate');
         const checkoutInput = document.getElementById('reservationCheckoutDate');
         const discountInput = document.getElementById('reservationDiscountAmount');
         const grossPreview = document.getElementById('reservationGrossAmount');
         const discountPreview = document.getElementById('reservationDiscountPreview');
         const netPreview = document.getElementById('reservationNetAmount');
-        const roomCompatibilityFeedback = document.getElementById('roomCompatibilityFeedback');
+        const reservationNightsCount = document.getElementById('reservationNightsCount');
 
         const parseDateOnly = (value) => {
             if (!value) return null;
@@ -714,138 +708,9 @@
             return Number.isNaN(parsed.getTime()) ? null : parsed;
         };
 
-        const evaluateRoomCompatibility = (roomId, roomStatus, newCheckinDate, newCheckoutDate) => {
-            if (!newCheckinDate) {
-                return { compatible: true, reason: '' };
-            }
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const roomReservations = roomPlanningReservations
-                .filter((reservation) => Number(reservation.room_id) === Number(roomId))
-                .map((reservation) => ({
-                    ...reservation,
-                    checkin: parseDateOnly(reservation.checkin),
-                    expected_checkout: parseDateOnly(reservation.expected_checkout),
-                }))
-                .filter((reservation) => reservation.checkin);
-
-            const occupiedLikeReservation = [...roomReservations]
-                .filter((reservation) => reservation.status === 'checked_in')
-                .sort((a, b) => b.checkin - a.checkin)[0]
-                || [...roomReservations]
-                    .filter((reservation) => reservation.status === 'reserved' && reservation.checkin <= today)
-                    .sort((a, b) => b.checkin - a.checkin)[0];
-
-            if (roomStatus === 'occupied') {
-                if (!occupiedLikeReservation) {
-                    return { compatible: false, reason: 'occupée actuellement' };
-                }
-
-                if (!occupiedLikeReservation.expected_checkout) {
-                    return { compatible: false, reason: 'occupation sans date de départ prévue' };
-                }
-
-                if (newCheckinDate < occupiedLikeReservation.expected_checkout) {
-                    return { compatible: false, reason: 'arrivée avant la fin prévue de l’occupation' };
-                }
-            }
-
-            const futureReservedDates = roomReservations
-                .filter((reservation) => reservation.status === 'reserved' && reservation.checkin > newCheckinDate)
-                .map((reservation) => reservation.checkin)
-                .sort((a, b) => a - b);
-
-            if (futureReservedDates.length > 0) {
-                const nearestReservedStart = futureReservedDates[0];
-                if (!newCheckoutDate) {
-                    return { compatible: false, reason: 'date prévue requise avant la prochaine réservation' };
-                }
-
-                if (newCheckoutDate >= nearestReservedStart) {
-                    return { compatible: false, reason: 'date prévue doit être avant la prochaine arrivée' };
-                }
-            }
-
-            const hasBlockingOverlap = roomReservations.some((reservation) => {
-                if (reservation.checkin > newCheckinDate) {
-                    return false;
-                }
-
-                if (reservation.status !== 'reserved' && reservation.status !== 'checked_in') {
-                    return false;
-                }
-
-                const reservationEnd = reservation.expected_checkout;
-                if (!reservationEnd) {
-                    return true;
-                }
-
-                if (occupiedLikeReservation && reservation.id === occupiedLikeReservation.id && newCheckinDate >= reservationEnd) {
-                    return false;
-                }
-
-                return newCheckinDate < reservationEnd;
-            });
-
-            if (hasBlockingOverlap) {
-                return { compatible: false, reason: 'chevauchement avec une réservation existante' };
-            }
-
-            return { compatible: true, reason: '' };
-        };
-
-        const refreshRoomCompatibility = () => {
-            if (!roomSelect) {
-                return;
-            }
-
-            const newCheckinDate = parseDateOnly(checkinInput?.value || '');
-            const newCheckoutDate = parseDateOnly(checkoutInput?.value || '');
-            const selectedValue = roomSelect.value;
-            let availableCount = 0;
-
-            [...roomSelect.options].forEach((option) => {
-                if (!option.value) {
-                    option.disabled = false;
-                    return;
-                }
-
-                const roomId = Number(option.value);
-                const roomStatus = option.dataset.status || 'available';
-                const baseLabel = option.dataset.baseLabel || option.textContent || '';
-                const result = evaluateRoomCompatibility(roomId, roomStatus, newCheckinDate, newCheckoutDate);
-
-                option.disabled = !result.compatible;
-                option.textContent = result.compatible ? baseLabel : `⛔ ${baseLabel}`;
-                option.title = result.reason || '';
-
-                if (result.compatible) {
-                    availableCount++;
-                }
-            });
-
-            if (selectedValue && roomSelect.selectedOptions[0]?.disabled) {
-                roomSelect.value = '';
-            }
-
-            if (roomCompatibilityFeedback) {
-                if (availableCount === 0) {
-                    roomCompatibilityFeedback.classList.remove('text-muted');
-                    roomCompatibilityFeedback.classList.add('text-danger');
-                    roomCompatibilityFeedback.textContent = 'Aucune chambre compatible pour les dates sélectionnées.';
-                } else {
-                    roomCompatibilityFeedback.classList.remove('text-danger');
-                    roomCompatibilityFeedback.classList.add('text-muted');
-                    roomCompatibilityFeedback.textContent = `${availableCount} chambre(s) compatible(s) pour ces dates.`;
-                }
-            }
-        };
-
         const computeReservationAmounts = () => {
-            const selectedRoom = roomSelect?.selectedOptions?.[0];
-            const nightly = Number(selectedRoom?.dataset?.price || 0);
+            const selectedApartment = apartmentSelect?.selectedOptions?.[0];
+            const nightly = Number(selectedApartment?.dataset?.price || 0);
 
             const checkinDate = checkinInput?.value ? new Date(checkinInput.value) : null;
             const checkoutDate = checkoutInput?.value ? new Date(checkoutInput.value) : null;
@@ -859,22 +724,17 @@
             const discount = Math.max(0, Number(discountInput?.value || 0));
             const net = Math.max(0, gross - discount);
 
+            if (reservationNightsCount) reservationNightsCount.textContent = String(nights);
             if (grossPreview) grossPreview.textContent = formatMoney(gross);
             if (discountPreview) discountPreview.textContent = formatMoney(discount);
             if (netPreview) netPreview.textContent = formatMoney(net);
         };
 
-        [roomSelect, checkinInput, checkoutInput, discountInput].forEach((el) => {
+        [apartmentSelect, checkinInput, checkoutInput, discountInput].forEach((el) => {
             el?.addEventListener('change', computeReservationAmounts);
             el?.addEventListener('input', computeReservationAmounts);
         });
 
-        [checkinInput, checkoutInput].forEach((el) => {
-            el?.addEventListener('change', refreshRoomCompatibility);
-            el?.addEventListener('input', refreshRoomCompatibility);
-        });
-
-        refreshRoomCompatibility();
         computeReservationAmounts();
 
         const clientSearchInput = document.getElementById('clientSearchInput');

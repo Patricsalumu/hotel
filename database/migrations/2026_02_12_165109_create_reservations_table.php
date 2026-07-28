@@ -16,7 +16,8 @@ return new class extends Migration
             $table->foreignId('client_id')->constrained()->cascadeOnDelete();
             $table->foreignId('room_id')->constrained()->cascadeOnDelete();
             $table->foreignId('manager_id')->constrained('users')->cascadeOnDelete();
-            $table->date('checkin_date');
+            $table->date('expected_checkin_date');
+            $table->date('checkin_date')->nullable();
             $table->date('expected_checkout_date')->nullable();
             $table->date('actual_checkout_date')->nullable();
             $table->enum('status', ['reserved', 'checked_in', 'checked_out'])->default('reserved');

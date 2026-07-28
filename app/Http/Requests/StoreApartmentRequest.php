@@ -23,7 +23,7 @@ class StoreApartmentRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'floor_number' => ['required', 'integer', 'min:0'],
+            'price_per_night' => ['required', 'numeric', 'min:0.01'],
         ];
     }
 }

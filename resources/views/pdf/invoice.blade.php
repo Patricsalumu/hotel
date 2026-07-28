@@ -149,7 +149,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ ($reservation->room->apartment->name ?? '-') . ' / Ch. ' . $reservation->room->number }}</td>
+                        <td>{{ ($reservation->room?->apartment->name ?? $reservation->apartment?->name ?? '-') . ($reservation->room?->number ? ' / Ch. ' . $reservation->room->number : '') }}</td>
                         <td>Prévues: {{ $expectedNights }}<br>Réelles: {{ $actualNights }}</td>
                         <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
                     </tr>
@@ -181,8 +181,8 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>{{ $reservation->room->apartment->name ?? '-' }}</td>
-                        <td>{{ $reservation->room->number }}</td>
+                        <td>{{ $reservation->room?->apartment->name ?? $reservation->apartment?->name ?? '-' }}</td>
+                        <td>{{ $reservation->room?->number ?? '-' }}</td>
                         <td>{{ $expectedNights }}</td>
                         <td>{{ $actualNights }}</td>
                         <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
@@ -204,7 +204,8 @@
     <div class="block">
         <div class="row"><span class="label">Créée par :</span> {{ $reservation->user?->name ?? $reservation->manager?->name ?? '-' }}</div>
         <div class="row"><span class="label">Date de création :</span> {{ $reservation->created_at?->format('Y-m-d H:i') }}</div>
-        <div class="row"><span class="label">Date d’arrivée :</span> {{ $reservation->checkin_date?->format('Y-m-d') }}</div>
+        <div class="row"><span class="label">Date entrée prévue :</span> {{ $reservation->expected_checkin_date?->format('Y-m-d') ?? '-' }}</div>
+        <div class="row"><span class="label">Date arrivée réelle :</span> {{ $reservation->checkin_date?->format('Y-m-d') ?? '-' }}</div>
         <div class="row"><span class="label">Date départ prévue :</span> {{ $reservation->expected_checkout_date?->format('Y-m-d') ?? '-' }}</div>
         <div class="row"><span class="label">Date départ réelle :</span> {{ $reservation->actual_checkout_date?->format('Y-m-d') ?? '-' }}</div>
     </div>

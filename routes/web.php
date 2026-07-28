@@ -64,8 +64,8 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('role:owner')->group(function () {
         Route::resource('owner/hotels', HotelController::class)->only(['index', 'store'])->names('owner.hotels');
-        Route::resource('owner/apartments', ApartmentController::class)->only(['index', 'store'])->names('owner.apartments');
-        Route::resource('owner/rooms', RoomController::class)->only(['index', 'store', 'update'])->names('owner.rooms');
+        Route::resource('owner/apartments', ApartmentController::class)->only(['index', 'store', 'update', 'destroy'])->names('owner.apartments');
+        Route::resource('owner/rooms', RoomController::class)->only(['index', 'store', 'update', 'destroy'])->names('owner.rooms');
         Route::post('/owner/rooms/layout', [RoomLayoutController::class, 'update'])->name('owner.rooms.layout.update');
     });
 

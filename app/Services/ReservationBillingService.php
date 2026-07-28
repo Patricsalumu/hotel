@@ -21,10 +21,10 @@ class ReservationBillingService
 
     public function computeGrossTotal(Reservation $reservation, Hotel $hotel, ?Carbon $now = null): float
     {
-        $reservation->loadMissing('room');
+        $reservation->loadMissing('apartment');
         $nights = $this->calculateNights($reservation, $hotel, $now);
 
-        return (float) $reservation->room->price_per_night * $nights;
+        return (float) ($reservation->apartment?->price_per_night ?? 0) * $nights;
     }
 
     public function computeNetTotal(Reservation $reservation, Hotel $hotel, ?Carbon $now = null): float
@@ -53,7 +53,7 @@ class ReservationBillingService
 
     public function shareSummary(Reservation $reservation, Hotel $hotel): string
     {
-        $reservation->loadMissing('room', 'client');
+        $reservation->loadMissing('apartment', 'room', 'client');
         $occupiedRooms = $hotel->apartments()->withCount(['rooms as occupied_rooms_count' => function ($query) {
             $query->where('status', 'occupied');
         }, 'rooms as available_rooms_count' => function ($query) {
@@ -64,7 +64,7 @@ class ReservationBillingService
             $query->where('status', 'available');
         }])->get()->sum('available_rooms_count');
 
-        return "Chambre {$reservation->room->number} occupée. Checkout prévu: "
+        return "Appartement {$reservation->apartment->name} occupé. Checkout prévu: "
             . optional($reservation->expected_checkout_date)->format('Y-m-d')
             . ". Montant total: {$reservation->total_amount}. Chambres occupées: {$occupiedRooms}, libres: {$availableRooms}.";
     }

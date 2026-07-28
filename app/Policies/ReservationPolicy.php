@@ -20,7 +20,11 @@ class ReservationPolicy
      */
     public function view(User $user, Reservation $reservation): bool
     {
-        $hotelId = $reservation->room->apartment->hotel_id;
+        $hotelId = $reservation->apartment?->hotel_id ?? $reservation->room?->apartment?->hotel_id;
+        if ($hotelId === null) {
+            return false;
+        }
+
         return $user->role === 'owner'
             ? optional($user->ownedHotel)->id === $hotelId
             : $user->hotel_id === $hotelId;

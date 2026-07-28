@@ -6,6 +6,7 @@ use App\Http\Requests\StoreReservationRequest;
 use App\Models\Client;
 use App\Models\Reservation;
 use App\Models\Room;
+use App\Models\Apartment;
 use App\Services\ReservationBillingService;
 use App\Support\Money;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -30,8 +31,8 @@ class ReservationController extends Controller
 
         $query = Reservation::query()
             ->withTrashed()
-            ->with(['client', 'room.apartment', 'payments'])
-            ->whereHas('room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id));
+            ->with(['client', 'apartment', 'room.apartment', 'payments'])
+            ->where('hotel_id', $hotel->id);
 
         $this->applyFilters($query, $request);
 
@@ -43,6 +44,10 @@ class ReservationController extends Controller
         $availableRooms = Room::where('status', 'available')
             ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
             ->orderBy('number')
+            ->get();
+
+        $bookableApartments = Apartment::where('hotel_id', $hotel->id)
+            ->orderBy('name')
             ->get();
 
         $bookableRooms = Room::whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
@@ -101,16 +106,16 @@ class ReservationController extends Controller
             'id' => $r->id,
             'room_id' => $r->room_id,
             'reference' => $r->reference,
-            'room_number' => $r->room->number,
+            'room_number' => $r->room?->number ?? '-',
             'client_name' => $r->client->name,
-            'checkin' => $r->checkin_date?->format('Y-m-d'),
+            'checkin' => ($r->checkin_date ?? $r->expected_checkin_date)?->format('Y-m-d'),
             'checkout' => ($r->actual_checkout_date ?? $r->expected_checkout_date ?? now())->format('Y-m-d'),
             'status' => $r->status,
             'is_cancelled' => $r->trashed(),
         ])->values()->toArray();
 
         $roomPlanningReservations = Reservation::query()
-            ->select(['id', 'room_id', 'checkin_date', 'expected_checkout_date', 'status'])
+            ->select(['id', 'room_id', 'checkin_date', 'expected_checkin_date', 'expected_checkout_date', 'status'])
             ->where('hotel_id', $hotel->id)
             ->whereNull('deleted_at')
             ->whereIn('status', ['reserved', 'checked_in'])
@@ -119,7 +124,7 @@ class ReservationController extends Controller
             ->map(fn ($reservation) => [
                 'id' => $reservation->id,
                 'room_id' => $reservation->room_id,
-                'checkin' => $reservation->checkin_date?->format('Y-m-d'),
+                'checkin' => ($reservation->checkin_date ?? $reservation->expected_checkin_date)?->format('Y-m-d'),
                 'expected_checkout' => $reservation->expected_checkout_date?->format('Y-m-d'),
                 'status' => $reservation->status,
             ])
@@ -131,6 +136,7 @@ class ReservationController extends Controller
             'clients',
             'availableRooms',
             'bookableRooms',
+            'bookableApartments',
             'hotel',
             'sharePageText',
             'sharePageMessage',
@@ -148,60 +154,82 @@ class ReservationController extends Controller
     public function store(StoreReservationRequest $request)
     {
         $hotel = $request->user()->currentHotel();
-        $checkinDate = Carbon::parse($request->date('checkin_date'))->startOfDay();
+        $expectedCheckinDate = Carbon::parse($request->date('expected_checkin_date'))->startOfDay();
+        $checkinDate = $request->date('checkin_date')
+            ? Carbon::parse($request->date('checkin_date'))->startOfDay()
+            : null;
         $expectedCheckoutDate = $request->date('expected_checkout_date')
             ? Carbon::parse($request->date('expected_checkout_date'))->startOfDay()
             : null;
 
-        $room = Room::where('id', $request->integer('room_id'))
-            ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+        $apartment = Apartment::where('id', $request->integer('apartment_id'))
+            ->where('hotel_id', $hotel->id)
             ->firstOrFail();
 
-        // determine initial reservation status based on checkin date relative to today
-        $today = Carbon::today()->toDateString();
-        $checkinDateString = $checkinDate->toDateString();
+        $room = null;
+        if ($request->filled('room_id')) {
+            $room = Room::where('id', $request->integer('room_id'))
+                ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+                ->first();
+        }
 
-        if ($checkinDateString === $today && $room->status !== 'occupied') {
-            // checkin happening today -> mark occupied
-            $initialStatus = 'checked_in';
-            $roomStatus = 'occupied';
-        } else {
-            // past or future check‑in should simply be reserved until the day arrives
-            $initialStatus = 'reserved';
-            $roomStatus = $room->status === 'occupied' ? 'occupied' : 'reserved';
+        $today = Carbon::today()->toDateString();
+        $checkinDateString = $checkinDate?->toDateString();
+
+        $initialStatus = $checkinDate ? 'checked_in' : 'reserved';
+        $roomStatus = null;
+
+        if ($room) {
+            if ($checkinDate) {
+                $initialStatus = 'checked_in';
+                $roomStatus = 'occupied';
+            } else {
+                $initialStatus = 'reserved';
+                $roomStatus = $room->status === 'occupied' ? 'occupied' : 'reserved';
+            }
         }
 
         $client = Client::where('id', $request->integer('client_id'))
             ->where('hotel_id', $hotel->id)
             ->firstOrFail();
 
-        $reservation = DB::transaction(function () use ($hotel, $room, $request, $client, $expectedCheckoutDate, $checkinDate, $initialStatus, $roomStatus) {
-            $lockedRoom = Room::whereKey($room->id)->lockForUpdate()->firstOrFail();
+        $reservation = DB::transaction(function () use ($hotel, $apartment, $room, $request, $client, $expectedCheckoutDate, $expectedCheckinDate, $checkinDate, $initialStatus, $roomStatus) {
+            $lockedRoom = $room ? Room::whereKey($room->id)->lockForUpdate()->first() : null;
 
-            $activeReservations = Reservation::query()
-                ->where('room_id', $lockedRoom->id)
-                ->where('hotel_id', $hotel->id)
-                ->whereNull('deleted_at')
-                ->whereIn('status', ['reserved', 'checked_in'])
-                ->orderBy('checkin_date')
-                ->lockForUpdate()
-                ->get();
+            if ($lockedRoom) {
+                $activeReservations = Reservation::query()
+                    ->where('room_id', $lockedRoom->id)
+                    ->where('hotel_id', $hotel->id)
+                    ->whereNull('deleted_at')
+                    ->whereIn('status', ['reserved', 'checked_in'])
+                    ->orderBy('checkin_date')
+                    ->lockForUpdate()
+                    ->get();
 
-            $this->assertRoomCanBeScheduled($lockedRoom, $activeReservations, $checkinDate, $expectedCheckoutDate);
+                $this->assertRoomCanBeScheduled($lockedRoom, $activeReservations, $checkinDate ?? $expectedCheckinDate, $expectedCheckoutDate);
+            }
 
             $nextReservationNumber = (int) Reservation::withTrashed()
                 ->where('hotel_id', $hotel->id)
                 ->lockForUpdate()
-                ->max('reservation_number') + 1;
+                ->selectRaw('MAX(CAST(reservation_number AS UNSIGNED)) as max_number')
+                ->value('max_number') + 1;
+
+            $connectionDriver = DB::getDriverName();
+            if ($connectionDriver === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = OFF');
+            }
 
             $reservation = Reservation::create([
                 'client_id' => $client->id,
-                'room_id' => $lockedRoom->id,
+                'apartment_id' => $apartment->id,
+                'room_id' => $lockedRoom?->id,
                 'hotel_id' => $hotel->id,
-                'reservation_number' => $nextReservationNumber,
+                'reservation_number' => str_pad($nextReservationNumber, 6, '0', STR_PAD_LEFT),
                 'manager_id' => $request->user()->id,
                 'id_user' => $request->user()->id,
-                'checkin_date' => $checkinDate->toDateString(),
+                'expected_checkin_date' => $expectedCheckinDate->toDateString(),
+                'checkin_date' => $checkinDate?->toDateString(),
                 'expected_checkout_date' => $expectedCheckoutDate?->toDateString(),
                 'status' => $initialStatus,
                 'payment_status' => 'unpaid',
@@ -209,14 +237,20 @@ class ReservationController extends Controller
                 'discount_amount' => (float) $request->input('discount_amount', 0),
             ]);
 
+            if ($connectionDriver === 'sqlite') {
+                DB::statement('PRAGMA foreign_keys = ON');
+            }
+
             $reservation->refresh();
             $reservation->update([
                 'total_amount' => $this->billingService->computeTotal($reservation, $hotel),
             ]);
 
-            $lockedRoom->update([
-                'status' => $roomStatus,
-            ]);
+            if ($lockedRoom) {
+                $lockedRoom->update([
+                    'status' => $roomStatus,
+                ]);
+            }
 
             return $reservation->load('payments');
         });
@@ -256,7 +290,7 @@ class ReservationController extends Controller
             ->with('success', $successMessage);
     }
 
-    private function assertRoomCanBeScheduled(Room $room, Collection $activeReservations, Carbon $newCheckin, ?Carbon $newExpectedCheckout): void
+    private function assertRoomCanBeScheduled(Room $room, Collection $activeReservations, Carbon $newStart, ?Carbon $newExpectedCheckout): void
     {
         $today = Carbon::today()->startOfDay();
 
@@ -268,13 +302,13 @@ class ReservationController extends Controller
         if (! $occupiedReservation) {
             $occupiedReservation = $activeReservations
                 ->filter(function (Reservation $reservation) use ($today): bool {
-                    if ($reservation->status !== 'reserved' || ! $reservation->checkin_date) {
+                    if ($reservation->status !== 'reserved' || ! ($reservation->checkin_date ?? $reservation->expected_checkin_date)) {
                         return false;
                     }
 
-                    return $reservation->checkin_date->copy()->startOfDay()->lte($today);
+                    return ($reservation->checkin_date ?? $reservation->expected_checkin_date)->copy()->startOfDay()->lte($today);
                 })
-                ->sortByDesc(fn (Reservation $reservation) => $reservation->checkin_date?->timestamp ?? 0)
+                ->sortByDesc(fn (Reservation $reservation) => ($reservation->checkin_date ?? $reservation->expected_checkin_date)?->timestamp ?? 0)
                 ->first();
         }
 
@@ -292,17 +326,17 @@ class ReservationController extends Controller
             }
 
             $occupiedExpectedCheckout = $occupiedReservation->expected_checkout_date->copy()->startOfDay();
-            if ($newCheckin->lt($occupiedExpectedCheckout)) {
+            if ($newStart->lt($occupiedExpectedCheckout)) {
                 throw ValidationException::withMessages([
-                    'checkin_date' => 'La nouvelle réservation doit commencer à partir de la date de départ prévue de l\'occupation en cours.',
+                    'expected_checkin_date' => 'La nouvelle réservation doit commencer à partir de la date de départ prévue de l\'occupation en cours.',
                 ]);
             }
         }
 
         $futureReservedStarts = $activeReservations
-            ->filter(fn (Reservation $reservation) => $reservation->status === 'reserved' && $reservation->checkin_date)
-            ->map(fn (Reservation $reservation) => $reservation->checkin_date->copy()->startOfDay())
-            ->filter(fn (Carbon $checkinDate) => $checkinDate->gt($newCheckin));
+            ->filter(fn (Reservation $reservation) => $reservation->status === 'reserved' && ($reservation->checkin_date ?? $reservation->expected_checkin_date))
+            ->map(fn (Reservation $reservation) => ($reservation->checkin_date ?? $reservation->expected_checkin_date)->copy()->startOfDay())
+            ->filter(fn (Carbon $startDate) => $startDate->gt($newStart));
 
         if ($futureReservedStarts->isNotEmpty()) {
             $nearestStart = $futureReservedStarts->sort()->first();
@@ -319,29 +353,25 @@ class ReservationController extends Controller
             }
         }
 
-        $blockingReservation = $activeReservations->first(function (Reservation $reservation) use ($newCheckin, $occupiedReservation): bool {
-            if (! $reservation->checkin_date) {
-                return false;
-            }
-
-            $start = $reservation->checkin_date->copy()->startOfDay();
-            if ($start->gt($newCheckin)) {
+        $blockingReservation = $activeReservations->first(function (Reservation $reservation) use ($newStart, $occupiedReservation): bool {
+            $start = ($reservation->checkin_date ?? $reservation->expected_checkin_date)?->copy()->startOfDay();
+            if (! $start || $start->gt($newStart)) {
                 return false;
             }
 
             if ($reservation->status === 'checked_in') {
                 $end = $reservation->expected_checkout_date?->copy()->startOfDay();
 
-                if ($occupiedReservation && $reservation->id === $occupiedReservation->id && $end && $newCheckin->gte($end)) {
+                if ($occupiedReservation && $reservation->id === $occupiedReservation->id && $end && $newStart->gte($end)) {
                     return false;
                 }
 
-                return ! $end || $newCheckin->lt($end);
+                return ! $end || $newStart->lt($end);
             }
 
             if ($reservation->status === 'reserved') {
                 $end = $reservation->expected_checkout_date?->copy()->startOfDay();
-                return ! $end || $newCheckin->lt($end);
+                return ! $end || $newStart->lt($end);
             }
 
             return false;
@@ -356,12 +386,12 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation)
     {
-        $reservation->load(['client', 'room.apartment.hotel', 'payments.user', 'manager', 'user']);
+        $reservation->load(['client', 'apartment.hotel', 'room.apartment.hotel', 'payments.user', 'manager', 'user']);
 
-        $hotel = $reservation->room->apartment->hotel;
+        $hotel = $reservation->room?->apartment?->hotel ?? $reservation->apartment?->hotel;
         $currency = $hotel->currency ?? 'FC';
         $nights = $reservation->computeNights(now(), $hotel->checkout_time);
-        $grossAmount = (float) $reservation->room->price_per_night * $nights;
+        $grossAmount = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $nights;
         $discountAmount = (float) ($reservation->discount_amount ?? 0);
         $netAmount = (float) $reservation->total_amount;
         $paidAmount = (float) $reservation->payments->sum('amount');
@@ -375,7 +405,7 @@ class ReservationController extends Controller
 
         $waText = "Notification ({$hotel->name})\n";
         $waText .= "Client: {$reservation->client->name}\n";
-        $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - Chambre {$reservation->room->number}\n";
+        $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - " . ($reservation->room?->number ? 'Chambre ' . $reservation->room->number : ($reservation->apartment?->name ?? 'Appartement')) . "\n";
         $waText .= "Nuitees: {$nights}\n";
         $waText .= "Total: " . Money::format($grossAmount, $currency) . "\n";
         $waText .= "Reduction: " . Money::format($discountAmount, $currency) . "\n";
@@ -401,28 +431,52 @@ class ReservationController extends Controller
 
         if ($action === 'cancel') {
             $reservation->delete();
-            $reservation->room->update(['status' => 'available']);
+            if ($reservation->room) {
+                $reservation->room->update(['status' => 'available']);
+            }
 
             return redirect()->route('reservations.index')->with('success', 'Réservation annulée avec succès.');
         }
 
         if ($action === 'checkin') {
-            $reservation->update(['status' => 'checked_in']);
-            $reservation->room->update(['status' => 'occupied']);
+            $reservation->loadMissing('apartment');
+            $room = $reservation->room;
+            if (! $room) {
+                $room = Room::query()
+                    ->where('apartment_id', $reservation->apartment_id)
+                    ->where('status', 'available')
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            $updateData = ['status' => 'checked_in'];
+            if (! $reservation->checkin_date) {
+                $updateData['checkin_date'] = today();
+            }
+
+            if ($room) {
+                $updateData['room_id'] = $room->id;
+                $reservation->update($updateData);
+                $room->update(['status' => 'occupied']);
+            } else {
+                $reservation->update($updateData);
+            }
         }
 
         if ($action === 'checkout') {
             DB::transaction(function () use ($request, $reservation): void {
                 $reservation->loadMissing('room.apartment.hotel');
 
-                $reservation->update([
+                    $reservation->update([
                     'status' => 'checked_out',
                     'actual_checkout_date' => today(),
                 ]);
 
-                $reservation->room()->update(['status' => 'available']);
+                if ($reservation->room) {
+                    $reservation->room->update(['status' => 'available']);
+                }
 
-                $hotel = $request->user()->currentHotel() ?? $reservation->room->apartment->hotel;
+                $hotel = $request->user()->currentHotel() ?? $reservation->room?->apartment?->hotel ?? $reservation->apartment?->hotel;
                 if ($hotel) {
                     $reservation->update([
                         'total_amount' => $this->billingService->computeTotal($reservation->fresh(), $hotel),
@@ -443,7 +497,7 @@ class ReservationController extends Controller
         $query = Reservation::query()
             ->withTrashed()
             ->with(['client', 'room', 'payments'])
-            ->whereHas('room.apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+            ->where('hotel_id', $hotel->id)
             ->latest();
 
         $this->applyFilters($query, $request);
@@ -575,10 +629,10 @@ class ReservationController extends Controller
     private function applyFilters($query, Request $request): void
     {
         if ($request->filled('from_date') && $request->filled('to_date')) {
-            $query->whereBetween('checkin_date', [$request->date('from_date'), $request->date('to_date')]);
+            $query->whereBetween('expected_checkin_date', [$request->date('from_date'), $request->date('to_date')]);
         } else {
             $query->where(function ($subQuery) {
-                $subQuery->whereDate('checkin_date', today())
+                $subQuery->whereDate('expected_checkin_date', today())
                     ->orWhere('status', 'reserved')
                     ->orWhereNotNull('deleted_at');
             });
@@ -600,7 +654,7 @@ class ReservationController extends Controller
 
         if ($request->filled('nights')) {
             $nights = (int) $request->input('nights');
-            $query->whereRaw('DATEDIFF(COALESCE(actual_checkout_date, expected_checkout_date, CURDATE()), checkin_date) = ?', [$nights]);
+            $query->whereRaw('DATEDIFF(COALESCE(actual_checkout_date, expected_checkout_date, CURDATE()), COALESCE(checkin_date, expected_checkin_date)) = ?', [$nights]);
         }
     }
 

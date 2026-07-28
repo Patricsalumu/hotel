@@ -28,36 +28,53 @@ class ReservationStatusTest extends TestCase
         $apt = Apartment::create([
             'hotel_id' => $hotel->id,
             'name' => 'Block A',
+            'price_per_night' => 50,
         ]);
         Room::create([
             'apartment_id' => $apt->id,
             'number' => '101',
-            'price_per_night' => 50,
         ]);
 
         $user->refresh();
         return $user;
     }
 
-    public function test_reservation_with_checkin_today_marks_room_occupied(): void
+    public function test_reservation_can_be_created_from_apartment_and_assigned_on_checkin(): void
     {
         $user = $this->prepareEnvironment();
+        $apartment = Apartment::first();
         $room = Room::first();
-        $client = Client::create(['name' => 'Sample']);
+        $client = Client::create(['name' => 'Sample', 'hotel_id' => $user->currentHotel()?->id]);
 
         $response = $this->actingAs($user)
             ->post(route('reservations.store'), [
                 'client_id' => $client->id,
-                'room_id' => $room->id,
+                'apartment_id' => $apartment->id,
                 'checkin_date' => Carbon::today()->toDateString(),
+                'expected_checkout_date' => Carbon::today()->addDays(2)->toDateString(),
             ]);
 
         $response->assertRedirect(route('reservations.index'));
 
+        $reservation = Reservation::query()->latest('id')->firstOrFail();
+
         $this->assertDatabaseHas('reservations', [
-            'room_id' => $room->id,
-            'status' => 'checked_in',
+            'id' => $reservation->id,
+            'apartment_id' => $apartment->id,
+            'room_id' => null,
+            'status' => 'reserved',
         ]);
+
+        $checkinResponse = $this->actingAs($user)
+            ->put(route('reservations.update', $reservation), [
+                'action' => 'checkin',
+            ]);
+
+        $checkinResponse->assertRedirect();
+
+        $reservation->refresh();
+        $this->assertSame('checked_in', $reservation->status);
+        $this->assertSame($room->id, $reservation->room_id);
 
         $this->assertDatabaseHas('rooms', [
             'id' => $room->id,
@@ -69,7 +86,7 @@ class ReservationStatusTest extends TestCase
     {
         $user = $this->prepareEnvironment();
         $room = Room::first();
-        $client = Client::create(['name' => 'Sample']);
+        $client = Client::create(['name' => 'Sample', 'hotel_id' => $user->currentHotel()?->id]);
 
         $response = $this->actingAs($user)
             ->post(route('reservations.store'), [
@@ -95,7 +112,7 @@ class ReservationStatusTest extends TestCase
     {
         $user = $this->prepareEnvironment();
         $room = Room::first();
-        $client = Client::create(['name' => 'Sample']);
+        $client = Client::create(['name' => 'Sample', 'hotel_id' => $user->currentHotel()?->id]);
 
         $response = $this->actingAs($user)
             ->post(route('reservations.store'), [

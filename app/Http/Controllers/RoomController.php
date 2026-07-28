@@ -112,4 +112,16 @@ class RoomController extends Controller
 
         return back()->with('success', 'Chambre modifiée avec succès.');
     }
+
+    public function destroy(Room $room)
+    {
+        $hotel = auth()->user()->currentHotel();
+        if (! $hotel || $room->apartment->hotel_id !== $hotel->id) {
+            abort(403);
+        }
+
+        $room->delete();
+
+        return back()->with('success', 'Chambre supprimée avec succès.');
+    }
 }

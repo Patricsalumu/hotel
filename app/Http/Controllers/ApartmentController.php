@@ -16,7 +16,9 @@ class ApartmentController extends Controller
         }
 
         $apartments = Apartment::where('hotel_id', $hotel->id)->withCount('rooms')->get();
-        return view('owner.apartments.index', compact('apartments'));
+        $currency = $hotel->currency ?? 'FC';
+
+        return view('owner.apartments.index', compact('apartments', 'currency'));
     }
 
     public function store(StoreApartmentRequest $request)
@@ -33,5 +35,33 @@ class ApartmentController extends Controller
         ]);
 
         return back()->with('success', 'Appartement ajouté avec succès.');
+    }
+
+    public function update(StoreApartmentRequest $request, Apartment $apartment)
+    {
+        $hotel = $request->user()->currentHotel();
+        if (! $hotel || $apartment->hotel_id !== $hotel->id) {
+            abort(403);
+        }
+
+        $apartment->update($request->validated());
+
+        return back()->with('success', 'Appartement modifié avec succès.');
+    }
+
+    public function destroy(Apartment $apartment)
+    {
+        $hotel = auth()->user()->currentHotel();
+        if (! $hotel || $apartment->hotel_id !== $hotel->id) {
+            abort(403);
+        }
+
+        if ($apartment->rooms()->exists()) {
+            return back()->with('error', 'Impossible de supprimer un appartement contenant des chambres.');
+        }
+
+        $apartment->delete();
+
+        return back()->with('success', 'Appartement supprimé avec succès.');
     }
 }

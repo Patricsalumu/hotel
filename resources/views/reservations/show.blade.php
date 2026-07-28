@@ -56,9 +56,10 @@
 
     <div class="row g-3">
         @php
-            $currency = $reservation->room->apartment->hotel->currency ?? 'FC';
-            $nights = $reservation->computeNights(now(), $reservation->room->apartment->hotel->checkout_time);
-            $grossAmount = (float) $reservation->room->price_per_night * $nights;
+            $currency = $reservation->room?->apartment?->hotel->currency ?? $reservation->apartment?->hotel->currency ?? 'FC';
+            $checkoutTime = $reservation->room?->apartment?->hotel->checkout_time ?? $reservation->apartment?->hotel->checkout_time ?? '12:00';
+            $nights = $reservation->computeNights(now(), $checkoutTime);
+            $grossAmount = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $nights;
             $discountAmount = (float) ($reservation->discount_amount ?? 0);
             $paidAmount = $reservation->payments->sum('amount');
             $netAmount = max(0, $grossAmount - $discountAmount);
@@ -68,8 +69,9 @@
             <div class="gh-card card"><div class="card-body">
                 <div class="row g-3">
                     <div class="col-md-6"><div class="gh-kpi h-100"><div class="gh-kpi-label">Client</div><div class="gh-kpi-value" style="font-size:1.15rem;">{{ $reservation->client->name }}</div></div></div>
-                    <div class="col-md-6"><div class="gh-kpi h-100"><div class="gh-kpi-label">Chambre</div><div class="gh-kpi-value" style="font-size:1.15rem;">#{{ $reservation->room->number }}</div></div></div>
-                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Date d’arrivée</div><div class="fw-semibold">{{ $reservation->checkin_date?->format('Y-m-d') }}</div></div></div>
+                    <div class="col-md-6"><div class="gh-kpi h-100"><div class="gh-kpi-label">Chambre/Appartement</div><div class="gh-kpi-value" style="font-size:1.15rem;">{{ $reservation->room?->number ? '#' . $reservation->room->number : ($reservation->apartment?->name ?? '-') }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Date entrée prévue</div><div class="fw-semibold">{{ $reservation->expected_checkin_date?->format('Y-m-d') }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Date d’arrivée réelle</div><div class="fw-semibold">{{ $reservation->checkin_date?->format('Y-m-d') ?? '-' }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ prévu</div><div class="fw-semibold">{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ réel</div><div class="fw-semibold">{{ $reservation->actual_checkout_date?->format('Y-m-d') ?? '-' }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total à payer</div><div class="gh-kpi-value">{{ \App\Support\Money::format($grossAmount, $currency) }}</div></div></div>

@@ -36,6 +36,7 @@
                 <th>Référence</th>
                 <th>Chambre</th>
                 <th>Client</th>
+                <th>Entrée prévue</th>
                 <th>Date d’arrivée</th>
                 <th>Départ prévu</th>
                 <th class="right">Total</th>
@@ -47,9 +48,10 @@
         @forelse($reservations as $r)
             <tr>
                 <td>{{ $r->reference }}</td>
-                <td>{{ $r->room->number }}</td>
+                <td>{{ $r->room?->number ? 'Ch. ' . $r->room->number : ($r->apartment?->name ?? '-') }}</td>
                 <td>{{ $r->client->name }}</td>
-                <td>{{ $r->checkin_date?->format('Y-m-d') }}</td>
+                <td>{{ ($r->checkin_date ?? $r->expected_checkin_date)?->format('Y-m-d') }}</td>
+                <td>{{ $r->checkin_date?->format('Y-m-d') ?? '-' }}</td>
                 <td>{{ $r->expected_checkout_date?->format('Y-m-d') }}</td>
                 <td class="right">{{ \App\Support\Money::format($r->total_amount, $currency) }}</td>
                 <td class="right">{{ \App\Support\Money::format($r->payments->sum('amount'), $currency) }}</td>
