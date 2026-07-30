@@ -244,7 +244,7 @@
                 <tbody>
                 @forelse($reservation->payments->sortByDesc('created_at') as $payment)
                     <tr>
-                        <td>{{ $payment->created_at?->format('d/m H:i') }}<br>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money', 'mpesa' => 'Mpesa', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}<br>{{ $payment->user?->name ?? '-' }}</td>
+                        <td>{{ $payment->created_at?->format('d/m H:i') }}<br>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money', 'mpesa' => 'Mpesa', 'card' => 'Carte bancaire', 'credit' => 'À crédit'][$payment->payment_method] ?? $payment->payment_method }}<br>{{ $payment->user?->name ?? '-' }}</td>
                         <td class="right">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
                     </tr>
                 @empty
@@ -269,7 +269,7 @@
                     <tr>
                         <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
                         <td class="right">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
-                        <td>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money', 'mpesa' => 'Mpesa', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
+                        <td>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money', 'mpesa' => 'Mpesa', 'card' => 'Carte bancaire', 'credit' => 'À crédit'][$payment->payment_method] ?? $payment->payment_method }}</td>
                         <td>{{ $payment->user?->name ?? '-' }}</td>
                     </tr>
                 @empty

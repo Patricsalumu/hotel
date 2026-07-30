@@ -15,7 +15,7 @@
                     <td>{{ $reservation->actual_checkout_date?->format('Y-m-d') ?? $reservation->expected_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ \App\Support\Money::format($reservation->total_amount, $currency) }}</td>
                     <td>{{ \App\Support\Money::format($reservation->payments->sum('amount'), $currency) }}</td>
-                    <td>{{ ['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status }} / {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$reservation->payment_status] ?? $reservation->payment_status }}</td>
+                    <td>{{ ['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status }} / {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé', 'credit' => 'à crédit'][$reservation->payment_status] ?? $reservation->payment_status }}</td>
                 </tr>
                 @endforeach
             </tbody>

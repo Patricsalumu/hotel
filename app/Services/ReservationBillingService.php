@@ -40,7 +40,11 @@ class ReservationBillingService
         $paid = (float) $reservation->payments()->sum('amount');
         $total = (float) $reservation->total_amount;
 
-        if ($paid <= 0) {
+        $hasCreditPayment = $reservation->payments()->where('payment_method', 'credit')->exists();
+
+        if ($hasCreditPayment && $paid > 0) {
+            $status = 'credit';
+        } elseif ($paid <= 0) {
             $status = 'unpaid';
         } elseif ($paid >= $total) {
             $status = 'paid';

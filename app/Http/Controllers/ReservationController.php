@@ -155,8 +155,8 @@ class ReservationController extends Controller
     {
         $hotel = $request->user()->currentHotel();
         $expectedCheckinDate = Carbon::parse($request->date('expected_checkin_date'))->startOfDay();
-        $checkinDate = $request->date('checkin_date')
-            ? Carbon::parse($request->date('checkin_date'))->startOfDay()
+        $checkinDate = $request->filled('checkin_date')
+            ? Carbon::parse($request->input('checkin_date'))
             : null;
         $expectedCheckoutDate = $request->date('expected_checkout_date')
             ? Carbon::parse($request->date('expected_checkout_date'))->startOfDay()
@@ -229,7 +229,7 @@ class ReservationController extends Controller
                 'manager_id' => $request->user()->id,
                 'id_user' => $request->user()->id,
                 'expected_checkin_date' => $expectedCheckinDate->toDateString(),
-                'checkin_date' => $checkinDate?->toDateString(),
+                'checkin_date' => $checkinDate?->toDateTimeString(),
                 'expected_checkout_date' => $expectedCheckoutDate?->toDateString(),
                 'status' => $initialStatus,
                 'payment_status' => 'unpaid',
@@ -438,9 +438,59 @@ class ReservationController extends Controller
             return redirect()->route('reservations.index')->with('success', 'Réservation annulée avec succès.');
         }
 
+        if ($action === 'change_room') {
+            $reservation->loadMissing(['apartment', 'room.apartment']);
+            $requestedRoomId = $request->input('room_id');
+            $hotel = $request->user()->currentHotel();
+
+            $newRoom = Room::query()
+                ->where('id', $requestedRoomId)
+                ->whereHas('apartment', fn ($q) => $q->where('hotel_id', $hotel->id))
+                ->where('status', 'available')
+                ->first();
+
+            if (! $newRoom) {
+                return back()->withErrors(['room_id' => 'Veuillez sélectionner une chambre disponible valide.']);
+            }
+
+            DB::transaction(function () use ($reservation, $newRoom): void {
+                $oldRoom = $reservation->room;
+                $reservation->update(['room_id' => $newRoom->id]);
+
+                $newRoom->update(['status' => $reservation->status === 'checked_in' ? 'occupied' : 'reserved']);
+
+                if ($oldRoom && $oldRoom->id !== $newRoom->id) {
+                    $otherAssigned = Reservation::query()
+                        ->where('room_id', $oldRoom->id)
+                        ->where('id', '!=', $reservation->id)
+                        ->whereNull('deleted_at')
+                        ->whereIn('status', ['reserved', 'checked_in'])
+                        ->exists();
+
+                    $oldRoom->update(['status' => $otherAssigned ? 'reserved' : 'available']);
+                }
+            });
+
+            return back()->with('success', 'Chambre changée avec succès.');
+        }
+
         if ($action === 'checkin') {
             $reservation->loadMissing('apartment');
             $room = $reservation->room;
+            $requestedRoomId = $request->input('room_id');
+
+            if ($requestedRoomId) {
+                $requestedRoom = Room::query()
+                    ->where('id', $requestedRoomId)
+                    ->where('apartment_id', $reservation->apartment_id)
+                    ->where('status', 'available')
+                    ->first();
+
+                if ($requestedRoom) {
+                    $room = $requestedRoom;
+                }
+            }
+
             if (! $room) {
                 $room = Room::query()
                     ->where('apartment_id', $reservation->apartment_id)
@@ -451,7 +501,9 @@ class ReservationController extends Controller
 
             $updateData = ['status' => 'checked_in'];
             if (! $reservation->checkin_date) {
-                $updateData['checkin_date'] = today();
+                $updateData['checkin_date'] = $request->filled('checkin_date')
+                    ? Carbon::parse($request->input('checkin_date'))->toDateTimeString()
+                    : now()->toDateTimeString();
             }
 
             if ($room) {
@@ -464,12 +516,17 @@ class ReservationController extends Controller
         }
 
         if ($action === 'checkout') {
+            $paymentStatus = $reservation->payment_status;
+            if ($paymentStatus === 'unpaid') {
+                return back()->withErrors(['reservation' => 'Impossible de faire le checkout tant que la réservation n’est pas payée ou à crédit.']);
+            }
+
             DB::transaction(function () use ($request, $reservation): void {
                 $reservation->loadMissing('room.apartment.hotel');
 
-                    $reservation->update([
+                $reservation->update([
                     'status' => 'checked_out',
-                    'actual_checkout_date' => today(),
+                    'actual_checkout_date' => now()->toDateTimeString(),
                 ]);
 
                 if ($reservation->room) {
@@ -629,23 +686,25 @@ class ReservationController extends Controller
     private function applyFilters($query, Request $request): void
     {
         if ($request->filled('from_date') && $request->filled('to_date')) {
-            $query->whereBetween('expected_checkin_date', [$request->date('from_date'), $request->date('to_date')]);
+            $query->whereDate('created_at', '>=', $request->date('from_date'))
+                ->whereDate('created_at', '<=', $request->date('to_date'));
         } else {
-            $query->where(function ($subQuery) {
-                $subQuery->whereDate('expected_checkin_date', today())
-                    ->orWhere('status', 'reserved')
-                    ->orWhereNotNull('deleted_at');
-            });
+            $query->whereDate('created_at', today());
         }
 
-        if ($request->filled('room_number')) {
-            $roomNumber = $request->string('room_number')->toString();
-            $query->whereHas('room', fn ($q) => $q->where('number', 'like', "%{$roomNumber}%"));
+        if ($request->filled('reservation_code')) {
+            $reservationCode = $request->string('reservation_code')->toString();
+            $query->where('reservation_number', 'like', "%{$reservationCode}%");
         }
 
         if ($request->filled('client_name')) {
             $clientName = $request->string('client_name')->toString();
             $query->whereHas('client', fn ($q) => $q->where('name', 'like', "%{$clientName}%"));
+        }
+
+        if ($request->filled('room_number')) {
+            $roomNumber = $request->string('room_number')->toString();
+            $query->whereHas('room', fn ($q) => $q->where('number', 'like', "%{$roomNumber}%"));
         }
 
         if ($request->filled('payment_status')) {

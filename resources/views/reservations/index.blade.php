@@ -195,44 +195,37 @@
     </style>
 
     <x-slot name="header">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-                <h4 class="mb-1">Réservations</h4>
-                <div class="small text-white-50">Suivi complet des séjours, statuts et règlements</div>
+        <div class="d-flex flex-column gap-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div>
+                    <h4 class="mb-1">Réservations</h4>
+                    <div class="small text-white-50">Suivi complet des séjours, statuts et règlements</div>
+                </div>
+                <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#createReservationModal">Nouvelle réservation</button>
             </div>
-            <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#createReservationModal">Nouvelle réservation</button>
+            <form class="d-flex flex-wrap gap-2 align-items-end" method="GET">
+                <div class="d-flex flex-column" style="min-width: 220px;">
+                    <label class="form-label mb-1">Code réservation</label>
+                    <input type="text" name="reservation_code" class="form-control form-control-sm" placeholder="Code réservation" value="{{ request('reservation_code') }}">
+                </div>
+                <div class="d-flex flex-column" style="min-width: 220px;">
+                    <label class="form-label mb-1">Client</label>
+                    <input type="text" name="client_name" class="form-control form-control-sm" placeholder="Client" value="{{ request('client_name') }}">
+                </div>
+                <div class="d-flex flex-column" style="min-width: 150px;">
+                    <label class="form-label mb-1">Du</label>
+                    <input type="date" name="from_date" class="form-control form-control-sm" value="{{ request('from_date', now()->toDateString()) }}">
+                </div>
+                <div class="d-flex flex-column" style="min-width: 150px;">
+                    <label class="form-label mb-1">Au</label>
+                    <input type="date" name="to_date" class="form-control form-control-sm" value="{{ request('to_date', now()->toDateString()) }}">
+                </div>
+                <button type="submit" class="btn btn-sm btn-light">Filtrer</button>
+            </form>
         </div>
     </x-slot>
 
     @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
-
-    {{-- shared summary for the current page/filter --}}
-    @if(!empty($sharePageText))
-        <div class="alert alert-info d-flex justify-content-between align-items-center gap-2 gh-mobile-stack">
-            <span id="shareText">{{ $sharePageText }}</span>
-            <textarea id="shareMessageRaw" class="d-none">{{ $sharePageMessage ?? $sharePageText }}</textarea>
-            <div class="d-flex gap-2 gh-mobile-stack">
-                @php
-                    $summaryText = $sharePageMessage ?? $sharePageText;
-                    $summaryWhatsAppUrl = !empty($whatsAppPhone)
-                        ? 'https://wa.me/' . $whatsAppPhone . '?text=' . urlencode($summaryText)
-                        : 'https://wa.me/?text=' . urlencode($summaryText);
-                @endphp
-                <a class="btn btn-sm btn-outline-success" target="_blank"
-                   href="{{ $summaryWhatsAppUrl }}">
-                    WhatsApp
-                </a>
-                <!-- <button class="btn btn-sm btn-outline-primary" 
-                    onclick="navigator.share ? navigator.share({text: document.getElementById('shareMessageRaw').value}) : alert('Partage non supporté')">
-                    Partager
-                </button> -->
-                <button class="btn btn-sm btn-outline-secondary" 
-                    onclick="navigator.clipboard.writeText(document.getElementById('shareMessageRaw').value)">
-                    Copier
-                </button>
-            </div>
-        </div>
-    @endif
 
     @php
         $currency = $hotel->currency ?? 'FC';
@@ -253,62 +246,6 @@
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Montant total</div><div class="rv-kpi-value">{{ \App\Support\Money::format($pageTotalAmount, $currency) }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Total payé</div><div class="rv-kpi-value text-success">{{ \App\Support\Money::format($pagePaidAmount, $currency) }}</div></div></div>
         <div class="col-md-3 col-6"><div class="rv-kpi h-100"><div class="rv-kpi-label">Solde</div><div class="rv-kpi-value {{ $pageSolde > 0 ? 'text-danger' : ($pageSolde < 0 ? 'text-success' : '') }}">{{ \App\Support\Money::format($pageSolde, $currency) }}</div></div></div>
-    </div>
-
-    <div class="gh-card card mb-3">
-        <div class="card-body">
-            <form class="row g-2 rv-toolbar" method="GET">
-                <div class="col-md-2"><label class="form-label">Du</label><input type="date" class="form-control" name="from_date" value="{{ request('from_date', now()->toDateString()) }}"></div>
-                <div class="col-md-2"><label class="form-label">Au</label><input type="date" class="form-control" name="to_date" value="{{ request('to_date', now()->toDateString()) }}"></div>
-                <div class="col-md-2"><label class="form-label">Chambre</label><input type="text" class="form-control" name="room_number" placeholder="N° chambre" value="{{ request('room_number') }}"></div>
-                <div class="col-md-2"><label class="form-label">Client</label><input type="text" class="form-control" name="client_name" placeholder="Nom client" value="{{ request('client_name') }}"></div>
-                <div class="col-md-2">
-                    <label class="form-label">Paiement</label>
-                    <select name="payment_status" class="form-select">
-                        <option value="">Paiement</option>
-                        <option value="paid" @selected(request('payment_status')==='paid')>Payées</option>
-                        <option value="unpaid" @selected(request('payment_status')==='unpaid')>Non payées</option>
-                        <option value="partial" @selected(request('payment_status')==='partial')>Partielles</option>
-                    </select>
-                </div>
-                <div class="col-md-1"><label class="form-label">Nuits</label><input type="number" min="1" name="nights" class="form-control" placeholder="Nuitées" value="{{ request('nights') }}"></div>
-                <div class="col-md-3 d-flex gap-2 gh-mobile-stack">
-                    <button class="btn gh-btn-primary btn-primary w-100">Filtrer</button>
-                    <a class="btn btn-outline-dark" href="{{ route('reports.reservations.pdf', request()->query()) }}">PDF</a>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="gh-card card mb-3">
-        <div class="card-body d-flex justify-content-between align-items-center gap-2 gh-mobile-stack">
-            <div class="fw-semibold">Créer une réservation</div>
-            <div class="view-toggle">
-                <button class="view-btn active" data-view="table">Tableau</button>
-                <button class="view-btn" data-view="calendar">Calendrier</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Calendrier -->
-    <div id="calendarView" class="gh-card card mb-3 d-none">
-        <div class="card-body">
-            <div class="calendar-controls">
-                <button id="prevMonth" class="btn btn-sm btn-outline-secondary">← Mois précédent</button>
-                <h5 id="monthYear" class="mb-0"></h5>
-                <button id="nextMonth" class="btn btn-sm btn-outline-secondary">Mois suivant →</button>
-            </div>
-            <div class="calendar-header">
-                <div>Dim</div>
-                <div>Lun</div>
-                <div>Mar</div>
-                <div>Mer</div>
-                <div>Jeu</div>
-                <div>Ven</div>
-                <div>Sam</div>
-            </div>
-            <div class="calendar-grid" id="calendarGrid"></div>
-        </div>
     </div>
 
     <!-- Tableau -->
@@ -419,32 +356,20 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 rv-table">
-            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Entrée prévue</th><th>Entrée réelle</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées</th><th>Total</th><th>Payé</th><th>Solde</th><th>Suivi</th></tr></thead>
+            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Entrée prévue</th><th>Entrée réelle</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées prévues</th><th>Nuitées réelles</th><th>Total</th><th>Payé</th><th>Solde</th><th>Suivi</th></tr></thead>
             <tbody>
             @forelse($reservations as $reservation)
                 @php
-                    $nights = $reservation->computeNights(now(), $hotel->checkout_time);
-                    $gross = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $nights;
+                    $expectedNights = max(1, ($reservation->expected_checkin_date && $reservation->expected_checkout_date)
+                        ? $reservation->expected_checkin_date->startOfDay()->diffInDays($reservation->expected_checkout_date->startOfDay(), false)
+                        : 1);
+                    $actualNights = $reservation->computeNights(now(), $hotel->checkout_time);
+                    $gross = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $actualNights;
                     $discount = (float) ($reservation->discount_amount ?? 0);
                     $netTotal = max(0, $gross - $discount);
                     $paid = $reservation->payments->sum('amount');
                     $solde = $netTotal - $paid;
                     $derivedPaymentStatus = $paid <= 0 ? 'unpaid' : ($paid >= $netTotal ? 'paid' : 'partial');
-                    $clientPhone = preg_replace('/\D+/', '', (string) $reservation->client->phone);
-                    $publicInvoiceA4 = \Illuminate\Support\Facades\URL::temporarySignedRoute('reservations.public.invoice.pdf', now()->addDays(7), ['reservation' => $reservation->id, 'paper' => 'a4']);
-                    $waText = "Notification - {$hotel->name}\n";
-                    $waText .= "Client: {$reservation->client->name}\n";
-                    $waText .= "Reservation #" . ($reservation->reservation_number ?? $reservation->id) . " - " . ($reservation->room?->number ? 'Chambre ' . $reservation->room->number : ($reservation->apartment?->name ?? 'Appartement')) . "\n";
-                    $waText .= "Nuitees: {$nights}\n";
-                    $waText .= "Total: " . \App\Support\Money::format($gross, $currency) . "\n";
-                    $waText .= "Reduction: " . \App\Support\Money::format($discount, $currency) . "\n";
-                    $waText .= "Net a payer: " . \App\Support\Money::format($netTotal, $currency) . "\n";
-                    $waText .= "Paye: " . \App\Support\Money::format($paid, $currency) . "\n";
-                    $waText .= "Solde: " . \App\Support\Money::format($solde, $currency) . "\n";
-                    $waText .= "Facture A4: {$publicInvoiceA4}";
-                    $waUrl = $clientPhone
-                        ? 'https://wa.me/' . $clientPhone . '?text=' . urlencode($waText)
-                        : 'https://wa.me/?text=' . urlencode($waText);
                 @endphp
                 <tr>
                     <td>
@@ -460,7 +385,8 @@
                     <td>{{ $reservation->checkin_date?->format('Y-m-d') ?? '-' }}</td>
                     <td>{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $reservation->actual_checkout_date?->format('Y-m-d') }}</td>
-                    <td>{{ $nights }}</td>
+                    <td>{{ $expectedNights }}</td>
+                    <td>{{ $actualNights }}</td>
                     <td><span class="fw-semibold">{{ \App\Support\Money::format($netTotal, $currency) }}</span></td>
                     <td><span class="text-success fw-semibold">{{ \App\Support\Money::format($paid, $currency) }}</span></td>
                     <td>
@@ -469,109 +395,14 @@
                         </span>
                     </td>
                     <td>
-                        <div class="rv-inline-tools">
-                            <div class="rv-action-row">
-                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal"
-                                        data-bs-target="#downloadInvoiceModal{{ $reservation->id }}" title="Télécharger facture">⬇</button>
-
-                                @if(!$reservation->trashed())
-                                    <button class="btn btn-sm btn-outline-dark" type="button" data-bs-toggle="modal"
-                                            data-bs-target="#paymentModal{{ $reservation->id }}" title="Payer" aria-label="Payer">💳</button>
-                                @else
-                                    <button class="btn btn-sm btn-outline-dark" type="button" title="Déjà payé" aria-label="Déjà payé" disabled>💳</button>
-                                @endif
-
-                                @if($reservation->status === 'reserved' && !$reservation->trashed())
-                                    <form method="POST" action="{{ route('reservations.update',$reservation) }}">
-                                        @csrf
-                                        @method('PUT')
-                                        <input type="hidden" name="action" value="checkin">
-                                        <button class="btn btn-sm btn-outline-success" title="Check-in" aria-label="Check-in">✅</button>
-                                    </form>
-                                @else
-                                    <button class="btn btn-sm btn-outline-success" type="button" title="Check-in" aria-label="Check-in" disabled>✅</button>
-                                @endif
-
-                                @if(!$reservation->trashed())
-                                    <form method="POST" action="{{ route('reservations.update',$reservation) }}">
-                                        @csrf
-                                        @method('PUT')
-                                        <input type="hidden" name="action" value="checkout">
-                                        <button class="btn btn-sm btn-outline-danger" title="Check-out" aria-label="Check-out">↩</button>
-                                    </form>
-                                    <form method="POST" action="{{ route('reservations.update',$reservation) }}" onsubmit="return confirm('Annuler cette réservation ?')">
-                                        @csrf
-                                        @method('PUT')
-                                        <input type="hidden" name="action" value="cancel">
-                                        <button class="btn btn-sm btn-outline-secondary" title="Annuler" aria-label="Annuler">✖</button>
-                                    </form>
-                                @else
-                                    <button class="btn btn-sm btn-outline-danger" type="button" title="Check-out" aria-label="Check-out" disabled>↩</button>
-                                    <button class="btn btn-sm btn-outline-secondary" type="button" title="Annulée" aria-label="Annulée" disabled>✖</button>
-                                @endif
-                            </div>
-
-                            <div class="rv-status mt-2">
-                                <span class="badge text-bg-{{ $reservation->trashed() ? 'secondary' : ($reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info')) }}">
-                                    {{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}
-                                </span>
-                                <span class="badge text-bg-{{ $derivedPaymentStatus === 'paid' ? 'success' : ($derivedPaymentStatus === 'partial' ? 'warning' : 'danger') }}">
-                                    {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$derivedPaymentStatus] }}
-                                </span>
-                            </div>
+                        <div class="rv-status">
+                            <span class="badge text-bg-{{ $reservation->trashed() ? 'secondary' : ($reservation->status === 'checked_out' ? 'secondary' : ($reservation->status === 'checked_in' ? 'warning' : 'info')) }}">
+                                {{ $reservation->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$reservation->status] ?? $reservation->status) }}
+                            </span>
+                            <span class="badge text-bg-{{ $derivedPaymentStatus === 'paid' ? 'success' : ($derivedPaymentStatus === 'partial' ? 'warning' : 'danger') }}">
+                                {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé', 'credit' => 'à crédit'][$derivedPaymentStatus] }}
+                            </span>
                         </div>
-
-                        <div class="modal fade" id="downloadInvoiceModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
-                            <div class="modal-dialog modal-sm">
-                                <div class="modal-content">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Télécharger facture</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body d-grid gap-2">
-                                        <a class="btn btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => 'a4']) }}">Format A4</a>
-                                        <a class="btn btn-outline-secondary" href="{{ route('reservations.invoice.pdf', ['reservation' => $reservation->id, 'paper' => '80mm']) }}">Format 80mm</a>
-                                        <a class="btn btn-outline-success" target="_blank" href="{{ $waUrl }}">Partager WhatsApp client</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        @if(!$reservation->trashed())
-                            <div class="modal fade" id="paymentModal{{ $reservation->id }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <form method="POST" action="{{ route('payments.store') }}">
-                                            @csrf
-                                            <input type="hidden" name="reservation_id" value="{{ $reservation->id }}">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">Paiement – {{ $reservation->room?->number ? 'Chambre ' . $reservation->room->number : ($reservation->apartment?->name ?? 'Réservation') }}</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="mb-2">
-                                                    <label class="form-label">Montant</label>
-                                                    <input type="number" step="0.01" min="0.01" class="form-control" name="amount" value="{{ number_format(max(0, $solde), 2, '.', '') }}" required>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Mode de paiement</label>
-                                                    <select class="form-select" name="payment_method" required>
-                                                        <option value="cash" selected>Cash</option>
-                                                        <option value="card">Carte bancaire</option>
-                                                        <option value="airtelmoney">Airtel money</option>
-                                                        <option value="mpesa">Mpesa</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-                                                <button class="btn gh-btn-primary btn-primary">Valider paiement</button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
                     </td>
                 </tr>
             @empty
@@ -592,59 +423,68 @@
         let currentMonth = new Date();
         const reservations = @json($calendarReservations ?? []);
         const roomPlanningReservations = @json($roomPlanningReservations ?? []);
+        const monthYearEl = document.getElementById('monthYear');
+        const calendarGridEl = document.getElementById('calendarGrid');
+        const prevMonthBtn = document.getElementById('prevMonth');
+        const nextMonthBtn = document.getElementById('nextMonth');
+        const viewButtons = document.querySelectorAll('.view-btn');
+        const tableViewEl = document.getElementById('tableView');
+        const calendarViewEl = document.getElementById('calendarView');
 
         function renderCalendar() {
+            if (!monthYearEl || !calendarGridEl) {
+                return;
+            }
+
             const year = currentMonth.getFullYear();
             const month = currentMonth.getMonth();
             const firstDay = new Date(year, month, 1);
             const lastDay = new Date(year, month + 1, 0);
             const prevLastDay = new Date(year, month, 0);
-            
-            document.getElementById('monthYear').textContent = `${['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][month]} ${year}`;
-            
-            const grid = document.getElementById('calendarGrid');
-            grid.innerHTML = '';
-            
+
+            monthYearEl.textContent = `${['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][month]} ${year}`;
+
+            calendarGridEl.innerHTML = '';
+
             const startDate = firstDay.getDay();
             for (let i = startDate - 1; i >= 0; i--) {
                 const day = prevLastDay.getDate() - i;
                 const cell = createDayCell(day, true);
-                grid.appendChild(cell);
+                calendarGridEl.appendChild(cell);
             }
-            
+
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const date = new Date(year, month, day);
                 const cell = createDayCell(day, false, date);
-                grid.appendChild(cell);
+                calendarGridEl.appendChild(cell);
             }
-            
-            for (let day = 1; grid.children.length % 7 !== 0; day++) {
+
+            for (let day = 1; calendarGridEl.children.length % 7 !== 0; day++) {
                 const cell = createDayCell(day, true);
-                grid.appendChild(cell);
+                calendarGridEl.appendChild(cell);
             }
         }
-        
+
         function createDayCell(day, isOtherMonth, date = null) {
             const cell = document.createElement('div');
             cell.className = 'calendar-day';
-            
+
             if (isOtherMonth) {
                 cell.classList.add('other-month');
             }
-            
+
             if (date) {
                 const today = new Date();
                 if (date.toDateString() === today.toDateString()) {
                     cell.classList.add('today');
                 }
-                
-                const dateStr = date.toISOString().split('T')[0];
+
                 const dayReservations = reservations.filter(r => {
                     const checkin = new Date(r.checkin);
                     const checkout = new Date(r.checkout);
                     return date >= checkin && date <= checkout;
                 });
-                
+
                 let html = `<div class="calendar-day-number">${day}</div>`;
                 if (dayReservations.length > 0) {
                     html += '<div class="calendar-reservations">';
@@ -658,35 +498,41 @@
             } else {
                 cell.textContent = day;
             }
-            
+
             return cell;
         }
-        
+
         // View toggle
-        document.querySelectorAll('.view-btn').forEach(btn => {
+        viewButtons.forEach(btn => {
             btn.addEventListener('click', function() {
-                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                viewButtons.forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
-                
+
                 const view = this.dataset.view;
-                document.getElementById('tableView').classList.toggle('d-none', view !== 'table');
-                document.getElementById('calendarView').classList.toggle('d-none', view !== 'calendar');
-                
+                if (tableViewEl && calendarViewEl) {
+                    tableViewEl.classList.toggle('d-none', view !== 'table');
+                    calendarViewEl.classList.toggle('d-none', view !== 'calendar');
+                }
+
                 if (view === 'calendar') {
                     renderCalendar();
                 }
             });
         });
-        
-        document.getElementById('prevMonth').addEventListener('click', () => {
-            currentMonth.setMonth(currentMonth.getMonth() - 1);
-            renderCalendar();
-        });
-        
-        document.getElementById('nextMonth').addEventListener('click', () => {
-            currentMonth.setMonth(currentMonth.getMonth() + 1);
-            renderCalendar();
-        });
+
+        if (prevMonthBtn) {
+            prevMonthBtn.addEventListener('click', () => {
+                currentMonth.setMonth(currentMonth.getMonth() - 1);
+                renderCalendar();
+            });
+        }
+
+        if (nextMonthBtn) {
+            nextMonthBtn.addEventListener('click', () => {
+                currentMonth.setMonth(currentMonth.getMonth() + 1);
+                renderCalendar();
+            });
+        }
 
         const formatMoney = (value) => {
             const numeric = Number(value || 0);

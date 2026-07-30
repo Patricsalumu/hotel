@@ -12,6 +12,10 @@ return new class extends Migration
         $driver = DB::getDriverName();
 
         if ($driver === 'sqlite') {
+            if (Schema::hasColumn('reservations', 'expected_checkin_date') && Schema::hasColumn('reservations', 'reservation_number')) {
+                return;
+            }
+
             DB::statement('PRAGMA foreign_keys = OFF');
 
             DB::statement(<<<'SQL'
@@ -70,9 +74,11 @@ return new class extends Migration
             DB::statement('ALTER TABLE reservations_new RENAME TO reservations');
             DB::statement('PRAGMA foreign_keys = ON');
         } else {
-            Schema::table('reservations', function (Blueprint $table) {
-                $table->date('expected_checkin_date')->nullable()->after('manager_id');
-            });
+            if (! Schema::hasColumn('reservations', 'expected_checkin_date')) {
+                Schema::table('reservations', function (Blueprint $table) {
+                    $table->date('expected_checkin_date')->nullable()->after('manager_id');
+                });
+            }
 
             DB::statement('ALTER TABLE reservations MODIFY reservation_number VARCHAR(6) NULL');
             DB::statement('ALTER TABLE reservations MODIFY checkin_date DATE NULL');

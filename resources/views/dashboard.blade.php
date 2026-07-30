@@ -51,27 +51,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="gh-card card mb-4"><div class="card-body">
-            @php
-                $total = max(1, $occupied + $reserved + $available);
-                $occupiedPct = round(($occupied / $total) * 100, 2);
-                $reservedPct = round(($reserved / $total) * 100, 2);
-                $availablePct = round(($available / $total) * 100, 2);
-            @endphp
-            <div class="mb-2 fw-semibold">Occupation des chambres</div>
-            <div class="progress gh-progress" role="progressbar" aria-label="Chambres">
-                <div class="progress-bar bg-danger room-progress" data-width="{{ $occupiedPct }}">Occupées</div>
-                <div class="progress-bar bg-warning room-progress" data-width="{{ $reservedPct }}">Réservées</div>
-                <div class="progress-bar bg-success room-progress" data-width="{{ $availablePct }}">Libres</div>
-            </div>
-            <div class="row mt-2 small text-muted">
-                <div class="col">Occupées: {{ $occupiedPct }}%</div>
-                <div class="col">Réservées: {{ $reservedPct }}%</div>
-                <div class="col">Libres: {{ $availablePct }}%</div>
-            </div>
-        </div></div>
-
         <div class="gh-card card">
             <div class="card-header">Chambres</div>
             <div class="card-body">
@@ -92,9 +71,12 @@
                                     @endphp
                                     <div class="small mt-2">{{ $checkin }}@if($expected) - {{ $expected }}@endif</div>
                                     <div class="small text-muted">{{ $latest->client->name ?? '-' }} • {{ $nights }} nuitée(s)</div>
-                                    <a href="{{ route('reservations.show', $latest) }}" class="btn btn-sm btn-outline-primary mt-2">Voir réservation</a>
+                                    <div class="d-flex gap-2 flex-wrap mt-2">
+                                        <a href="{{ route('reservations.show', $latest) }}" class="btn btn-sm btn-outline-primary">Voir réservation</a>
+                                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changeRoomModal" data-reservation-id="{{ $latest->id }}" data-room-id="{{ $room->id }}" data-room-number="{{ $room->number }}" data-apartment-id="{{ $room->apartment_id }}" data-apartment-name="{{ $room->apartment->name }}">Changer</button>
+                                    </div>
                                 @elseif($room->status === 'available')
-                                    <button class="btn btn-sm gh-btn-primary btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#reservationModal" data-apartment-id="{{ $room->apartment_id }}" data-apartment-name="{{ $room->apartment->name }}" data-apartment-price="{{ (float) $room->apartment->price_per_night }}">Créer réservation</button>
+                                    <button class="btn btn-sm gh-btn-primary btn-primary mt-2" data-bs-toggle="modal" data-bs-target="#reservationModal" data-apartment-id="{{ $room->apartment_id }}" data-room-id="{{ $room->id }}" data-room-number="{{ $room->number }}" data-apartment-name="{{ $room->apartment->name }}">Check-in</button>
                                 @endif
                             </div>
                         </div>
@@ -106,51 +88,75 @@
         <div class="modal fade" id="reservationModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
-                    <form method="POST" action="{{ route('reservations.store') }}">
+                    <form method="POST" action="{{ route('reservations.update', ['reservation' => 0]) }}" id="dashboardCheckinForm">
                         @csrf
-                        <input type="hidden" name="creation_source" value="dashboard_shortcut">
+                        @method('PUT')
+                        <input type="hidden" name="action" value="checkin">
                         <div class="modal-header">
-                            <h5 class="modal-title">Nouvelle réservation <span class="badge text-bg-info ms-1">Raccourci dashboard</span> <span id="apartmentLabel" class="text-muted"></span></h5>
+                            <h5 class="modal-title">Check-in <span class="badge text-bg-info ms-1">Raccourci dashboard</span> <span id="apartmentLabel" class="text-muted"></span></h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body">
                             <input type="hidden" name="apartment_id" id="modalApartmentId">
-                            <input type="hidden" id="modalApartmentPrice" value="0">
+                            <input type="hidden" id="modalRoomId" name="room_id">
                             <div class="row g-2">
                                 <div class="col-md-6">
-                                    <label class="form-label">Rechercher client</label>
-                                    <input type="text" class="form-control" id="dashboardClientSearchInput" placeholder="Tapez une lettre...">
-                                    <div class="small text-muted mt-1" id="dashboardClientSearchFeedback"></div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Client</label>
-                                    <select class="form-select" name="client_id" id="dashboardClientSelect" required>
-                                        <option value="">Sélectionner</option>
-                                        @foreach($clients as $client)
-                                            <option value="{{ $client->id }}">{{ $client->name }}</option>
-                                        @endforeach
+                                    <label class="form-label">Réservation</label>
+                                    <select class="form-select" name="reservation_id" id="dashboardReservationSelect" required>
+                                        <option value="">Sélectionner une réservation</option>
                                     </select>
-                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="dashboardOpenCreateClientBtn" data-bs-toggle="modal" data-bs-target="#dashboardCreateClientQuickModal">Nouveau client</button>
+                                    <div class="alert alert-warning d-none mt-2" id="dashboardNoReservationsAlert">Aucune réservation disponible pour cet appartement.</div>
                                 </div>
-                            </div>
-                            <div class="row g-2">
-                                <div class="col-md-6"><label class="form-label">Date entrée prévue</label><input type="date" class="form-control" id="dashboardExpectedCheckinDate" name="expected_checkin_date" value="{{ old('expected_checkin_date', now()->toDateString()) }}" min="{{ now()->toDateString() }}" required></div>
-                                <div class="col-md-6"><label class="form-label">Checkout prévu</label><input type="date" class="form-control" id="dashboardCheckoutDate" name="expected_checkout_date" value="{{ old('expected_checkout_date') }}" min="{{ now()->toDateString() }}"></div>
-                            </div>
-                            <div class="mt-2">
-                                <label class="form-label">Réduction</label>
-                                <input type="number" step="0.01" min="0" class="form-control" id="dashboardDiscountAmount" name="discount_amount" value="{{ old('discount_amount', 0) }}" placeholder="0">
+                                <div class="col-md-6">
+                                    <label class="form-label">Date d'entrée</label>
+                                    <input type="date" class="form-control" id="dashboardCheckinDate" name="checkin_date" required>
+                                </div>
                             </div>
                             <div class="mt-3 border rounded p-2 bg-light">
-                                <div class="d-flex justify-content-between"><span>Nuitées</span><strong id="dashboardNightsCount">1</strong></div>
-                                <div class="d-flex justify-content-between"><span>Total à payer</span><strong id="dashboardGrossAmount">0 {{ $currency }}</strong></div>
-                                <div class="d-flex justify-content-between"><span>Réduction</span><strong id="dashboardDiscountPreview">0 {{ $currency }}</strong></div>
-                                <div class="d-flex justify-content-between"><span>Net à payer</span><strong id="dashboardNetAmount">0 {{ $currency }}</strong></div>
+                                <div class="d-flex justify-content-between"><span>Réservation sélectionnée</span><strong id="dashboardSelectedReservationInfo">Aucune</strong></div>
                             </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-                            <button class="btn btn-primary">Créer</button>
+                            <button id="dashboardConfirmCheckinBtn" class="btn btn-primary">Confirmer check-in</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="changeRoomModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <form method="POST" action="" id="dashboardChangeRoomForm">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="action" value="change_room">
+                        <input type="hidden" id="changeRoomToRoomId" name="room_id">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Changer de chambre</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <div class="small text-muted">Chambre actuelle</div>
+                                    <div class="fw-semibold" id="changeRoomCurrentLabel">-</div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="small text-muted">Appartement</div>
+                                    <div class="fw-semibold" id="changeRoomApartmentLabel">-</div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="small text-muted">Chambres disponibles</div>
+                                    <div class="list-group" id="changeRoomAvailableList"></div>
+                                    <div class="alert alert-warning d-none mt-2" id="changeRoomNoRoomAlert">Aucune chambre disponible pour cet appartement.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+                            <button type="submit" class="btn btn-primary" id="changeRoomConfirmBtn" disabled>Confirmer le changement</button>
                         </div>
                     </form>
                 </div>
@@ -179,204 +185,15 @@
             </div>
         </div>
 
-        <script>
-            document.querySelectorAll('.room-progress').forEach(el => {
-                el.style.width = `${el.dataset.width}%`;
-            });
-
-            const reservationModal = document.getElementById('reservationModal');
-            reservationModal.addEventListener('show.bs.modal', event => {
-                const button = event.relatedTarget;
-                document.getElementById('modalApartmentId').value = button.getAttribute('data-apartment-id');
-                document.getElementById('modalApartmentPrice').value = button.getAttribute('data-apartment-price') || '0';
-                document.getElementById('apartmentLabel').textContent = button.getAttribute('data-apartment-name') ? `(${button.getAttribute('data-apartment-name')})` : '';
-                computeDashboardAmounts();
-            });
-
-            const dashboardClientSearchInput = document.getElementById('dashboardClientSearchInput');
-            const dashboardClientSelect = document.getElementById('dashboardClientSelect');
-            const dashboardClientSearchFeedback = document.getElementById('dashboardClientSearchFeedback');
-            const dashboardCreateClientModalEl = document.getElementById('dashboardCreateClientQuickModal');
-            const dashboardClientCreateForm = document.getElementById('dashboardCreateClientQuickForm');
-            const dashboardClientCreateFeedback = document.getElementById('dashboardClientCreateFeedback');
-            const dashboardCheckinDate = document.getElementById('dashboardExpectedCheckinDate');
-            const dashboardCheckoutDate = document.getElementById('dashboardCheckoutDate');
-            const dashboardDiscountAmount = document.getElementById('dashboardDiscountAmount');
-            const dashboardNightsCount = document.getElementById('dashboardNightsCount');
-            const dashboardGrossAmount = document.getElementById('dashboardGrossAmount');
-            const dashboardDiscountPreview = document.getElementById('dashboardDiscountPreview');
-            const dashboardNetAmount = document.getElementById('dashboardNetAmount');
-            const dashboardApartmentPrice = document.getElementById('modalApartmentPrice');
-
-            const dashboardClients = [...(dashboardClientSelect?.options || [])]
-                .filter((option) => option.value)
-                .map((option) => ({ id: Number(option.value), name: option.textContent || '' }));
-
-            const formatMoney = (value) => {
-                const numeric = Number(value || 0);
-                return `${numeric.toLocaleString('fr-FR', {minimumFractionDigits: 2, maximumFractionDigits: 2})} {{ $currency }}`;
-            };
-
-            const computeDashboardAmounts = () => {
-                const nightly = Number(dashboardApartmentPrice?.value || 0);
-                const checkinDate = dashboardCheckinDate?.value ? new Date(dashboardCheckinDate.value) : null;
-                const checkoutDate = dashboardCheckoutDate?.value ? new Date(dashboardCheckoutDate.value) : null;
-                let nights = 1;
-                if (checkinDate && checkoutDate && checkoutDate >= checkinDate) {
-                    nights = Math.max(1, Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24)));
-                }
-                const gross = nightly * nights;
-                const discount = Math.max(0, Number(dashboardDiscountAmount?.value || 0));
-                const net = Math.max(0, gross - discount);
-
-                if (dashboardNightsCount) dashboardNightsCount.textContent = String(nights);
-                if (dashboardGrossAmount) dashboardGrossAmount.textContent = formatMoney(gross);
-                if (dashboardDiscountPreview) dashboardDiscountPreview.textContent = formatMoney(discount);
-                if (dashboardNetAmount) dashboardNetAmount.textContent = formatMoney(net);
-            };
-
-            [dashboardCheckinDate, dashboardCheckoutDate, dashboardDiscountAmount].forEach((el) => {
-                el?.addEventListener('input', computeDashboardAmounts);
-                el?.addEventListener('change', computeDashboardAmounts);
-            });
-            computeDashboardAmounts();
-
-            const setDashboardFeedback = (message, type = 'info') => {
-                if (!dashboardClientSearchFeedback) return;
-                dashboardClientSearchFeedback.classList.remove('text-danger', 'text-success', 'text-muted', 'text-warning');
-                if (type === 'error') dashboardClientSearchFeedback.classList.add('text-danger');
-                else if (type === 'success') dashboardClientSearchFeedback.classList.add('text-success');
-                else if (type === 'warning') dashboardClientSearchFeedback.classList.add('text-warning');
-                else dashboardClientSearchFeedback.classList.add('text-muted');
-                dashboardClientSearchFeedback.textContent = message;
-            };
-
-            const renderDashboardClients = (clients) => {
-                if (!dashboardClientSelect) return;
-                dashboardClientSelect.innerHTML = '<option value="">Sélectionner</option>';
-                clients.forEach((client) => {
-                    const option = document.createElement('option');
-                    option.value = String(client.id);
-                    option.textContent = client.name;
-                    dashboardClientSelect.appendChild(option);
-                });
-
-                if (clients.length > 0) {
-                    dashboardClientSelect.value = String(clients[0].id);
-                }
-            };
-
-            let dashboardRemoteDebounce;
-
-            const remoteDashboardSearch = async (term) => {
-                const query = term.trim();
-                if (!query) {
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`{{ route('clients.search') }}?q=${encodeURIComponent(query)}`, {
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                    });
-                    const data = await response.json();
-                    const clients = data?.clients || [];
-                    if (clients.length > 0) {
-                        renderDashboardClients(clients);
-                        setDashboardFeedback(`${clients.length} client(s) trouvé(s).`, 'success');
-                        return;
-                    }
-                    setDashboardFeedback('Aucun client trouvé. Utilisez "Nouveau client".', 'warning');
-                } catch (error) {
-                    setDashboardFeedback('Erreur de recherche client.', 'error');
-                }
-            };
-
-            dashboardClientSearchInput?.addEventListener('input', () => {
-                const term = (dashboardClientSearchInput.value || '').trim().toLowerCase();
-                if (!term) {
-                    renderDashboardClients(dashboardClients);
-                    setDashboardFeedback('', 'info');
-                    clearTimeout(dashboardRemoteDebounce);
-                    return;
-                }
-
-                const matches = dashboardClients.filter((client) => client.name.toLowerCase().includes(term));
-                renderDashboardClients(matches);
-
-                if (matches.length > 0) {
-                    setDashboardFeedback(`${matches.length} client(s) trouvé(s).`, 'success');
-                } else {
-                    setDashboardFeedback('Recherche serveur en cours...', 'info');
-                }
-
-                clearTimeout(dashboardRemoteDebounce);
-                dashboardRemoteDebounce = setTimeout(() => remoteDashboardSearch(term), 250);
-            });
-
-            const upsertDashboardClient = (client) => {
-                if (!dashboardClientSelect || !client?.id) return;
-                let option = [...dashboardClientSelect.options].find((opt) => Number(opt.value) === Number(client.id));
-                if (!option) {
-                    option = document.createElement('option');
-                    option.value = String(client.id);
-                    dashboardClientSelect.appendChild(option);
-                }
-                option.textContent = client.name;
-                dashboardClientSelect.value = String(client.id);
-            };
-
-            dashboardClientCreateForm?.addEventListener('submit', async (event) => {
-                event.preventDefault();
-                const submitButton = dashboardClientCreateForm.querySelector('button[type="submit"]');
-                if (submitButton) submitButton.disabled = true;
-                if (dashboardClientCreateFeedback) {
-                    dashboardClientCreateFeedback.className = 'small mt-2 text-muted';
-                    dashboardClientCreateFeedback.textContent = 'Création en cours...';
-                }
-
-                const formData = new FormData(dashboardClientCreateForm);
-                try {
-                    const response = await fetch(`{{ route('clients.quick-store') }}`, {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                        },
-                        body: formData,
-                    });
-
-                    const data = await response.json();
-                    if (!response.ok) {
-                        const firstError = data?.errors ? Object.values(data.errors)[0][0] : 'Erreur de création client.';
-                        if (dashboardClientCreateFeedback) {
-                            dashboardClientCreateFeedback.className = 'small mt-2 text-danger';
-                            dashboardClientCreateFeedback.textContent = firstError;
-                        }
-                        return;
-                    }
-
-                    dashboardClients.push({ id: Number(data.client.id), name: data.client.name });
-                    upsertDashboardClient(data.client);
-                    if (dashboardClientCreateFeedback) {
-                        dashboardClientCreateFeedback.className = 'small mt-2 text-success';
-                        dashboardClientCreateFeedback.textContent = 'Client créé et sélectionné.';
-                    }
-                    dashboardClientCreateForm.reset();
-                    bootstrap.Modal.getOrCreateInstance(dashboardCreateClientModalEl).hide();
-                    bootstrap.Modal.getOrCreateInstance(reservationModal).show();
-                } catch (error) {
-                    if (dashboardClientCreateFeedback) {
-                        dashboardClientCreateFeedback.className = 'small mt-2 text-danger';
-                        dashboardClientCreateFeedback.textContent = 'Erreur serveur. Réessayez.';
-                    }
-                } finally {
-                    if (submitButton) submitButton.disabled = false;
-                }
-            });
-        </script>
+        <div id="dashboardData"
+            data-is-owner="{{ $isOwner ? '1' : '0' }}"
+            data-reservation-base-url="{{ url('reservations') }}"
+            data-currency="{{ $currency }}"
+            data-clients-search-route="{{ route('clients.search') }}"
+            data-clients-quick-store-route="{{ route('clients.quick-store') }}"
+        ></div>
+        <script id="dashboardReservationsData" type="application/json">{!! json_encode($dashboardReservations, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+        <script id="dashboardAvailableRoomsData" type="application/json">{!! json_encode($availableRooms, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+        <script src="{{ asset('js/dashboard.js') }}"></script>
     @endif
 </x-app-layout>

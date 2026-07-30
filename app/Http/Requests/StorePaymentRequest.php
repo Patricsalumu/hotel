@@ -25,7 +25,7 @@ class StorePaymentRequest extends FormRequest
         return [
             'reservation_id' => ['required', 'exists:reservations,id'],
             'amount' => ['required', 'numeric', 'min:0.01'],
-            'payment_method' => ['required', Rule::in(['cash', 'airtelmoney', 'mpesa', 'card'])],
+            'payment_method' => ['required', Rule::in(['cash', 'airtelmoney', 'mpesa', 'card', 'credit'])],
         ];
     }
 }

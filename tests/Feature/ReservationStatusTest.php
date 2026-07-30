@@ -134,6 +134,38 @@ class ReservationStatusTest extends TestCase
         ]);
     }
 
+    public function test_checkin_and_checkout_dates_are_saved_with_time(): void
+    {
+        $user = $this->prepareEnvironment();
+        $room = Room::first();
+        $client = Client::create(['name' => 'Sample', 'hotel_id' => $user->currentHotel()?->id]);
+
+        $response = $this->actingAs($user)
+            ->post(route('reservations.store'), [
+                'client_id' => $client->id,
+                'room_id' => $room->id,
+                'checkin_date' => '2026-07-29 14:35:00',
+                'expected_checkout_date' => '2026-07-30',
+            ]);
+
+        $response->assertRedirect(route('reservations.index'));
+
+        $reservation = Reservation::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('14:35', $reservation->checkin_date->format('H:i'));
+
+        $checkoutResponse = $this->actingAs($user)
+            ->put(route('reservations.update', $reservation), [
+                'action' => 'checkout',
+            ]);
+
+        $checkoutResponse->assertRedirect();
+
+        $reservation->refresh();
+
+        $this->assertNotSame('00:00', $reservation->actual_checkout_date->format('H:i'));
+    }
+
     public function test_checkout_releases_room_even_if_expected_checkout_date_not_reached(): void
     {
         $user = $this->prepareEnvironment();

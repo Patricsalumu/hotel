@@ -33,13 +33,19 @@ class PaymentController extends Controller
 
         $requestedAmount = (float) $request->input('amount');
 
+        $paymentMethod = $request->string('payment_method')->toString();
+
         Payment::create([
             'reservation_id' => $reservation->id,
             'id_user' => $request->user()->id,
             'amount' => $requestedAmount,
-            'payment_method' => $request->string('payment_method')->toString(),
+            'payment_method' => $paymentMethod,
             'created_at' => now(),
         ]);
+
+        if ($paymentMethod === 'credit') {
+            $reservation->update(['status' => $reservation->status === 'checked_out' ? 'checked_out' : $reservation->status]);
+        }
 
         $this->billingService->refreshPaymentStatus($reservation->fresh());
 

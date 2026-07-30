@@ -43,9 +43,9 @@ class Reservation extends Model
 
     protected $casts = [
         'expected_checkin_date' => 'date',
-        'checkin_date' => 'date',
+        'checkin_date' => 'datetime',
         'expected_checkout_date' => 'date',
-        'actual_checkout_date' => 'date',
+        'actual_checkout_date' => 'datetime',
         'total_amount' => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'reservation_number' => 'string',
@@ -99,23 +99,25 @@ class Reservation extends Model
 
     public function computeNights(Carbon $now, string $checkoutTime): int
     {
-        $start = Carbon::parse($this->checkin_date ?? $this->expected_checkin_date)->startOfDay();
-        $usingCurrentDate = false;
+        $start = Carbon::parse($this->checkin_date ?? $this->expected_checkin_date ?? $now->toDateString())->startOfDay();
+        $today = $now->copy()->startOfDay();
 
         if ($this->actual_checkout_date) {
             $end = Carbon::parse($this->actual_checkout_date)->startOfDay();
-        } elseif ($this->expected_checkout_date) {
+            $useCurrentDate = false;
+        } elseif ($this->expected_checkout_date && $today->gte(Carbon::parse($this->expected_checkout_date)->startOfDay())) {
             $end = Carbon::parse($this->expected_checkout_date)->startOfDay();
+            $useCurrentDate = false;
         } else {
-            $usingCurrentDate = true;
-            $end = $now->copy()->startOfDay();
+            $end = $today;
+            $useCurrentDate = true;
         }
 
         $nights = max(1, $start->diffInDays($end, false));
 
         if (
-            $usingCurrentDate &&
-            $now->copy()->startOfDay()->gt($start) &&
+            $useCurrentDate &&
+            $today->gt($start) &&
             $now->format('H:i') > Carbon::parse($checkoutTime)->format('H:i')
         ) {
             $nights++;

@@ -121,6 +121,7 @@ class HotelAppSeeder extends Seeder
             'manager_id' => $manager->id,
             'checkin_date' => now()->toDateString(),
         ], [
+            'expected_checkin_date' => now()->toDateString(),
             'expected_checkout_date' => now()->addDay()->toDateString(),
             'status' => 'checked_in',
             'payment_status' => 'partial',

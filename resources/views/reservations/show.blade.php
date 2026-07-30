@@ -1,7 +1,8 @@
 <x-app-layout>
     @php
         $canCheckin = $reservation->status === 'reserved' && ! $reservation->trashed();
-        $canCheckout = ! $reservation->trashed();
+        $canCheckout = ! $reservation->trashed() && in_array($reservation->payment_status, ['paid', 'partial', 'credit'], true) && $reservation->status !== 'checked_out';
+        $canPay = ! $reservation->trashed();
     @endphp
     <x-slot name="header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -101,7 +102,7 @@
                             <tr>
                                 <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
                                 <td class="fw-semibold">{{ \App\Support\Money::format($payment->amount, $currency) }}</td>
-                                <td>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money','mpesa' => 'Mpesa', 'card' => 'Carte bancaire'][$payment->payment_method] ?? $payment->payment_method }}</td>
+                                <td>{{ ['cash' => 'Cash', 'airtelmoney' => 'Airtel money','mpesa' => 'Mpesa', 'card' => 'Carte bancaire', 'credit' => 'À crédit'][$payment->payment_method] ?? $payment->payment_method }}</td>
                                 <td>{{ $payment->user?->name ?? '-' }}</td>
                             </tr>
                         @empty
@@ -119,7 +120,13 @@
                 <h6 class="mb-3">Encaisser</h6>
                 @if($reservation->trashed())
                     <div class="alert alert-secondary mb-0">Cette réservation est annulée. Paiement indisponible.</div>
-                @else
+                @elseif($reservation->status === 'checked_out' && $reservation->payment_status === 'unpaid')
+                    <div class="alert alert-warning mb-0">Cette réservation est déjà terminée. Vous pouvez néanmoins enregistrer un paiement à crédit pour la relancer.</div>
+                @elseif($reservation->status === 'checked_out' && in_array($reservation->payment_status, ['paid', 'partial', 'credit'], true))
+                    <div class="alert alert-info mb-0">La réservation est déjà terminée ; le paiement peut encore être enregistré.</div>
+                @endif
+
+                @if($canPay)
                     <form method="POST" action="{{ route('payments.store') }}" class="vstack gap-2">
                         @csrf
                         <input type="hidden" name="reservation_id" value="{{ $reservation->id }}">
@@ -129,8 +136,9 @@
                             <option value="airtelmoney">Airtel money</option>
                             <option value="mpesa">Mpesa</option>
                             <option value="card">Carte bancaire</option>
+                            <option value="credit">À crédit</option>
                         </select>
-                        <button class="btn gh-btn-primary btn-primary">Valider paiement</button>
+                        <button class="btn gh-btn-primary btn-primary" {{ $reservation->status === 'checked_out' && $reservation->payment_status === 'unpaid' ? '' : '' }}>Valider paiement</button>
                     </form>
                 @endif
             </div></div>

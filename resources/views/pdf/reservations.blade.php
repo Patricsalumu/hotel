@@ -55,7 +55,7 @@
                 <td>{{ $r->expected_checkout_date?->format('Y-m-d') }}</td>
                 <td class="right">{{ \App\Support\Money::format($r->total_amount, $currency) }}</td>
                 <td class="right">{{ \App\Support\Money::format($r->payments->sum('amount'), $currency) }}</td>
-                <td>{{ $r->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$r->status] ?? $r->status) }} / {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé'][$r->payment_status] ?? $r->payment_status }}</td>
+                <td>{{ $r->trashed() ? 'annulée' : (['reserved' => 'réservée', 'checked_in' => 'en cours', 'checked_out' => 'terminée'][$r->status] ?? $r->status) }} / {{ ['unpaid' => 'non payé', 'partial' => 'partiel', 'paid' => 'payé', 'credit' => 'à crédit'][$r->payment_status] ?? $r->payment_status }}</td>
             </tr>
         @empty
             <tr>
