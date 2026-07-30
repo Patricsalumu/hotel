@@ -158,6 +158,10 @@
                         <td class="right">{{ \App\Support\Money::format($grossAmount, $currency) }}</td>
                     </tr>
                     <tr>
+                        <td colspan="2"><strong>Total facture</strong></td>
+                        <td class="right">{{ \App\Support\Money::format($plannedTotalAmount, $currency) }}</td>
+                    </tr>
+                    <tr>
                         <td colspan="2"><strong>Réduction</strong></td>
                         <td class="right">{{ \App\Support\Money::format($discountAmount, $currency) }}</td>
                     </tr>
@@ -176,6 +180,7 @@
                         <th>Nuitée prévue</th>
                         <th>Nuitée réelle</th>
                         <th>Montant / nuit</th>
+                        <th>Total facture</th>
                         <th>Net</th>
                     </tr>
                 </thead>
@@ -186,14 +191,15 @@
                         <td>{{ $expectedNights }}</td>
                         <td>{{ $actualNights }}</td>
                         <td class="right">{{ \App\Support\Money::format($pricePerNight, $currency) }}</td>
+                        <td class="right">{{ \App\Support\Money::format($plannedTotalAmount, $currency) }}</td>
                         <td class="right">{{ \App\Support\Money::format($totalAmount, $currency) }}</td>
                     </tr>
                     <tr>
-                        <td colspan="5"><strong>Total à payer</strong></td>
+                        <td colspan="6"><strong>Total à payer</strong></td>
                         <td class="right">{{ \App\Support\Money::format($grossAmount, $currency) }}</td>
                     </tr>
                     <tr>
-                        <td colspan="5"><strong>Réduction</strong></td>
+                        <td colspan="6"><strong>Réduction</strong></td>
                         <td class="right">{{ \App\Support\Money::format($discountAmount, $currency) }}</td>
                     </tr>
                 </tbody>

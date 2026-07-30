@@ -356,16 +356,16 @@
 
     <div class="gh-card card table-responsive">
         <table class="table table-hover align-middle mb-0 rv-table">
-            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Entrée prévue</th><th>Entrée réelle</th><th>Départ prévu</th><th>Départ réel</th><th>Nuitées prévues</th><th>Nuitées réelles</th><th>Total</th><th>Payé</th><th>Solde</th><th>Suivi</th></tr></thead>
+            <thead class="table-light"><tr><th>Réservation</th><th>Chambre</th><th>Client</th><th>Entrée P</th><th>Entrée R</th><th>Départ P</th><th>Départ R</th><th>Nuitées P</th><th>Nuitées R</th><th>Total P</th><th>Total R</th><th>Payé</th><th>Solde</th><th>Statut</th></tr></thead>
             <tbody>
             @forelse($reservations as $reservation)
                 @php
-                    $expectedNights = max(1, ($reservation->expected_checkin_date && $reservation->expected_checkout_date)
-                        ? $reservation->expected_checkin_date->startOfDay()->diffInDays($reservation->expected_checkout_date->startOfDay(), false)
-                        : 1);
+                    $expectedNights = $reservation->computePlannedNights();
                     $actualNights = $reservation->computeNights(now(), $hotel->checkout_time);
+                    $plannedGross = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $expectedNights;
                     $gross = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $actualNights;
                     $discount = (float) ($reservation->discount_amount ?? 0);
+                    $plannedNetTotal = max(0, $plannedGross - $discount);
                     $netTotal = max(0, $gross - $discount);
                     $paid = $reservation->payments->sum('amount');
                     $solde = $netTotal - $paid;
@@ -387,6 +387,7 @@
                     <td>{{ $reservation->actual_checkout_date?->format('Y-m-d') }}</td>
                     <td>{{ $expectedNights }}</td>
                     <td>{{ $actualNights }}</td>
+                    <td><span class="fw-semibold">{{ \App\Support\Money::format($plannedNetTotal, $currency) }}</span></td>
                     <td><span class="fw-semibold">{{ \App\Support\Money::format($netTotal, $currency) }}</span></td>
                     <td><span class="text-success fw-semibold">{{ \App\Support\Money::format($paid, $currency) }}</span></td>
                     <td>

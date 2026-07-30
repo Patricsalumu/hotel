@@ -430,6 +430,10 @@ class ReservationController extends Controller
         }
 
         if ($action === 'cancel') {
+            if ($reservation->checkin_date || in_array($reservation->status, ['checked_in', 'checked_out'], true)) {
+                return redirect()->route('reservations.index')->withErrors(['reservation' => 'Impossible d’annuler une réservation déjà check-in.']);
+            }
+
             $reservation->delete();
             if ($reservation->room) {
                 $reservation->room->update(['status' => 'available']);
@@ -612,12 +616,17 @@ class ReservationController extends Controller
         $reservation->load([
             'client',
             'room.apartment.hotel',
+            'apartment.hotel',
             'payments.user',
             'user',
             'manager',
         ]);
 
-        $hotel = $reservation->room->apartment->hotel;
+        $hotel = $reservation->room?->apartment?->hotel ?? $reservation->apartment?->hotel;
+        if (! $hotel) {
+            abort(404, 'Aucun hôtel associé à cette réservation.');
+        }
+
         $currency = $hotel->currency ?? 'FC';
 
         $paidAmount = (float) $reservation->payments->sum('amount');
@@ -626,11 +635,9 @@ class ReservationController extends Controller
         $totalAmount = max(0, $grossAmount - $discountAmount);
         $remainingAmount = max(0, $totalAmount - $paidAmount);
 
-        $expectedEndDate = $reservation->expected_checkout_date
-            ?? $reservation->actual_checkout_date
-            ?? now()->startOfDay();
-
-        $expectedNights = max(1, $reservation->checkin_date->startOfDay()->diffInDays($expectedEndDate->startOfDay(), false));
+        $expectedNights = $reservation->computePlannedNights();
+        $plannedGrossAmount = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $expectedNights;
+        $plannedTotalAmount = max(0, $plannedGrossAmount - $discountAmount);
 
         $actualNights = $reservation->computeNights(now(), $hotel->checkout_time);
         $pricePerNight = $actualNights > 0 ? round($grossAmount / $actualNights, 2) : $grossAmount;
@@ -666,6 +673,8 @@ class ReservationController extends Controller
             'totalAmount',
             'remainingAmount',
             'expectedNights',
+            'plannedGrossAmount',
+            'plannedTotalAmount',
             'actualNights',
             'pricePerNight',
             'paymentStatusLabel',

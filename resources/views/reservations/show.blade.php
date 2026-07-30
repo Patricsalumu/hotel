@@ -3,6 +3,7 @@
         $canCheckin = $reservation->status === 'reserved' && ! $reservation->trashed();
         $canCheckout = ! $reservation->trashed() && in_array($reservation->payment_status, ['paid', 'partial', 'credit'], true) && $reservation->status !== 'checked_out';
         $canPay = ! $reservation->trashed();
+        $canCancel = ! $reservation->trashed() && ! $reservation->checkin_date && ! in_array($reservation->status, ['checked_in', 'checked_out'], true);
     @endphp
     <x-slot name="header">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -17,17 +18,6 @@
                     <a href="{{ $whatsAppInvoiceUrl ?? '#' }}" target="_blank" class="btn btn-sm btn-outline-light">WhatsApp client</a>
                 </div>
                 <div class="d-flex flex-wrap gap-2 align-items-center border-start border-light ps-3">
-                    @if($canCheckin)
-                        <form method="POST" action="{{ route('reservations.update', $reservation) }}" class="m-0">
-                            @csrf
-                            @method('PUT')
-                            <input type="hidden" name="action" value="checkin">
-                            <button class="btn btn-sm btn-outline-success" type="submit" aria-label="Check-in">Check-in</button>
-                        </form>
-                    @else
-                        <button class="btn btn-sm btn-outline-success" type="button" disabled>Check-in</button>
-                    @endif
-
                     @if($canCheckout)
                         <form method="POST" action="{{ route('reservations.update', $reservation) }}" class="m-0">
                             @csrf
@@ -39,15 +29,17 @@
                         <button class="btn btn-sm btn-outline-danger" type="button" disabled>Check-out</button>
                     @endif
 
-                    @if(! $reservation->trashed())
+                    @if($canCancel)
                         <form method="POST" action="{{ route('reservations.update', $reservation) }}" onsubmit="return confirm('Annuler cette réservation ?')" class="m-0">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="action" value="cancel">
                             <button class="btn btn-sm btn-outline-secondary" type="submit" aria-label="Annuler">Annuler</button>
                         </form>
-                    @else
+                    @elseif($reservation->trashed())
                         <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Annulée</button>
+                    @else
+                        <button class="btn btn-sm btn-outline-secondary" type="button" disabled>Annuler</button>
                     @endif
                 </div>
                 <a href="{{ route('reservations.index') }}" class="btn btn-sm btn-light">Retour aux réservations</a>
@@ -60,10 +52,13 @@
             $currency = $reservation->room?->apartment?->hotel->currency ?? $reservation->apartment?->hotel->currency ?? 'FC';
             $checkoutTime = $reservation->room?->apartment?->hotel->checkout_time ?? $reservation->apartment?->hotel->checkout_time ?? '12:00';
             $nights = $reservation->computeNights(now(), $checkoutTime);
+            $plannedNights = $reservation->computePlannedNights();
             $grossAmount = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $nights;
+            $plannedGrossAmount = (float) ($reservation->apartment?->price_per_night ?? $reservation->room?->price_per_night ?? 0) * $plannedNights;
             $discountAmount = (float) ($reservation->discount_amount ?? 0);
             $paidAmount = $reservation->payments->sum('amount');
             $netAmount = max(0, $grossAmount - $discountAmount);
+            $plannedNetAmount = max(0, $plannedGrossAmount - $discountAmount);
             $solde = $netAmount - (float) $paidAmount;
         @endphp
         <div class="col-md-8">
@@ -76,6 +71,7 @@
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ prévu</div><div class="fw-semibold">{{ $reservation->expected_checkout_date?->format('Y-m-d') }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Départ réel</div><div class="fw-semibold">{{ $reservation->actual_checkout_date?->format('Y-m-d') ?? '-' }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total à payer</div><div class="gh-kpi-value">{{ \App\Support\Money::format($grossAmount, $currency) }}</div></div></div>
+                    <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Total facture</div><div class="gh-kpi-value">{{ \App\Support\Money::format($plannedNetAmount, $currency) }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Réduction</div><div class="gh-kpi-value text-warning">{{ \App\Support\Money::format($discountAmount, $currency) }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Net à payer</div><div class="gh-kpi-value">{{ \App\Support\Money::format($netAmount, $currency) }}</div></div></div>
                     <div class="col-md-4"><div class="gh-kpi h-100"><div class="gh-kpi-label">Montant déjà payé</div><div class="gh-kpi-value text-success">{{ \App\Support\Money::format($paidAmount, $currency) }}</div></div></div>

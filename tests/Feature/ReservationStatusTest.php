@@ -206,4 +206,45 @@ class ReservationStatusTest extends TestCase
             'status' => 'available',
         ]);
     }
+
+    public function test_planned_nights_are_computed_from_expected_dates(): void
+    {
+        $reservation = new Reservation([
+            'expected_checkin_date' => '2026-07-10',
+            'expected_checkout_date' => '2026-07-13',
+        ]);
+
+        $this->assertSame(3, $reservation->computePlannedNights());
+    }
+
+    public function test_cancel_is_blocked_once_a_checkin_exists(): void
+    {
+        $user = $this->prepareEnvironment();
+        $hotel = $user->currentHotel();
+        $apartment = Apartment::first();
+        $client = Client::create(['name' => 'Sample', 'hotel_id' => $hotel?->id]);
+
+        $reservation = Reservation::create([
+            'client_id' => $client->id,
+            'apartment_id' => $apartment->id,
+            'hotel_id' => $hotel?->id,
+            'manager_id' => $user->id,
+            'reservation_number' => '000001',
+            'expected_checkin_date' => Carbon::today()->toDateString(),
+            'expected_checkout_date' => Carbon::today()->addDay()->toDateString(),
+            'checkin_date' => Carbon::now()->toDateTimeString(),
+            'status' => 'checked_in',
+            'payment_status' => 'unpaid',
+            'total_amount' => 0,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->put(route('reservations.update', $reservation), [
+                'action' => 'cancel',
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHasErrors('reservation');
+        $this->assertFalse($reservation->fresh()->trashed());
+    }
 }

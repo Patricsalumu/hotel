@@ -97,9 +97,21 @@ class Reservation extends Model
         return max(0, (float) $this->total_amount - $this->paid_amount);
     }
 
+    public function computePlannedNights(): int
+    {
+        $start = Carbon::parse($this->expected_checkin_date?->toDateString() ?? $this->checkin_date?->toDateString() ?? now()->toDateString())->startOfDay();
+        $end = Carbon::parse($this->expected_checkout_date?->toDateString() ?? $this->actual_checkout_date?->toDateString() ?? $this->expected_checkin_date?->toDateString() ?? now()->toDateString())->startOfDay();
+
+        return max(1, $start->diffInDays($end, false));
+    }
+
     public function computeNights(Carbon $now, string $checkoutTime): int
     {
-        $start = Carbon::parse($this->checkin_date ?? $this->expected_checkin_date ?? $now->toDateString())->startOfDay();
+        if (! $this->checkin_date) {
+            return $this->computePlannedNights();
+        }
+
+        $start = Carbon::parse($this->checkin_date)->startOfDay();
         $today = $now->copy()->startOfDay();
 
         if ($this->actual_checkout_date) {

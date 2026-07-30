@@ -31,7 +31,7 @@ Route::get('/', function () {
         return redirect()->route('dashboard');
     }
 
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 Route::get('/dashboard', DashboardController::class)->middleware(['auth'])->name('dashboard');
